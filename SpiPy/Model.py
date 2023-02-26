@@ -1,14 +1,14 @@
 from statsmodels.tsa.api import AutoReg, VAR
+import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 import pandas as pd
 import numpy as np
 
 
-def spatial_VAR(endog_df, spillover_matrix):
-    lagged_spillover = np.roll(spillover_matrix, 1, axis=0)
-    lagged_spillover[0, :] = 0
-
-    spatialVAR = VAR(endog_df, exog=lagged_spillover).fit(maxlags=1, trend='c')
+def spatial_VAR(pollution, spillover_matrix):
+    lagged_spillover = spillover_matrix.shift(1)
+    lagged_spillover.at[spillover_matrix.index[0], :] = 0
+    spatialVAR = VAR(pollution, exog=lagged_spillover).fit(maxlags=1, trend='c')
     print(spatialVAR.summary())
     return spatialVAR
 
@@ -28,7 +28,9 @@ def main() -> None:
     filepath_pol = "/Users/main/Vault/Thesis/Code/Data/pollution.csv"
     filepath_spill = "/Users/main/Vault/Thesis/Code/Data/spillover_effects.csv"
     df_pol, WWY = spatial_data(filepath_pol, filepath_spill)
-    spatial_VAR(df_pol, WWY)
+    spatial_model = spatial_VAR(df_pol, WWY)
+
+    print(spatial_model.test_normality(signif=0.05).summary())
     return None
 
 

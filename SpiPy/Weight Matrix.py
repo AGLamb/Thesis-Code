@@ -45,7 +45,9 @@ def weight_angle_matrix(loc_dict):
     locations = list(loc_dict.keys())
 
     for i in range(len(loc_dict)):
+
         for j in range(len(loc_dict)):
+
             if i != j:
                 theta = get_bearing(loc_dict[locations[i]], loc_dict[locations[j]])
                 W[i, j] = 1 / great_circle(loc_dict[locations[i]], loc_dict[locations[j]]).km
@@ -65,6 +67,12 @@ def wind_tensor(pol, angle, wind, W_matrix, AngleMatrix):
         time_speed = wind.iloc[i, :].to_numpy().reshape(len(angle.columns), 1)
         WW[i, :, :] = np.cos(AngleMatrix - time_angle[np.newaxis, :]) * time_speed[np.newaxis, :] * W_matrix
         WWY[i, :] = np.matmul(WW[i, :, :], pol.iloc[i, :].to_numpy())
+    WWY = pd.DataFrame(WWY)
+
+    for i in range(len(pol.columns)):
+        WWY.rename(columns={i: 'Spatial ' + pol.columns[i]}, inplace=True)
+
+    WWY.set_index(pol.index, inplace=True)
 
     return WWY, WW
 
@@ -80,8 +88,6 @@ def main() -> None:
     coordinates = coordinate_dict(df_gen, geographical, df_pol)
     weight_matrix, angle_matrix = weight_angle_matrix(coordinates)
     spillover_matrix, tensor_W = wind_tensor(df_pol, df_angle, df_speed, weight_matrix, angle_matrix)
-    spillover_matrix = pd.DataFrame(spillover_matrix)
-    spillover_matrix.set_index(df_pol.index, inplace=True)
 
     np.save("/Users/main/Vault/Thesis/Code/Data/tensor_W.npy", tensor_W)
     spillover_matrix.to_csv('/Users/main/Vault/Thesis/Code/Data/spillover_effects.csv')

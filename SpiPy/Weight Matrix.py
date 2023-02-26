@@ -1,11 +1,6 @@
-from statsmodels.tsa.stattools import adfuller, coint
-from statsmodels.tsa.vector_ar.vecm import coint_johansen
-from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
-from statsmodels.tsa.api import AutoReg, VAR, VARMAX
 from geopy.distance import great_circle
-import matplotlib.pyplot as plt
-import sklearn.metrics as skm
 from hampel import hampel
+from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import math
@@ -20,28 +15,78 @@ def get_bearing(coor1, coor2):
     return brng
 
 
-Locations = grouped_df["tag"].unique()
-LocDict = dict()
-
-for i in range(len(Locations)):
-    LocDict[Locations[i]] = (grouped_df[grouped_df.tag == Locations[i]]["latitude"].mean(),
-                             grouped_df[grouped_df.tag == Locations[i]]["longitude"].mean())
-
-
-LocDict.pop('Velsen-Zuid')
-LocDict.pop('Uithoorn')
-LocDict.pop('Koog aan de Zaan')
-LocDict.pop('Wijk aan Zee')
-Locations = np.delete(Locations, [10, 9, 7, 3])
+def get_data(path_df, path_pol, path_angle, path_wind):
+    df = pd.read_csv(path_df, index_col=0)
+    pol = pd.read_csv(path_pol, index_col=0)
+    angle = pd.read_csv(path_angle, index_col=0)
+    wind = pd.read_csv(path_wind, index_col=0)
+    return df, pol, angle, wind
 
 
-W = np.zeros((len(LocDict), len(LocDict)))
-AngleMatrix = np.zeros((len(LocDict), len(LocDict)))
+def coordinate_dict(df, geo_level, pol):
+    if geo_level == "street":
+        geo_att = "name"
+    else:
+        geo_att = "tag"
 
-for i in range(len(LocDict)):
-    for j in range(len(LocDict)):
-        if i != j:
-            theta = get_bearing(LocDict[Locations[i]], LocDict[Locations[j]])
-            W[i, j] = great_circle(LocDict[Locations[i]], LocDict[Locations[j]]).km
-            AngleMatrix[i, j] = theta
-#
+    locations = list(pol.columns)
+    c_dict = dict()
+
+    for item in locations:
+        c_dict[item] = [df.loc[df[geo_att] == item, "latitude"].mean(),
+                        df.loc[df[geo_att] == item, "longitude"].mean()]
+
+    return c_dict
+
+
+def weight_angle_matrix(loc_dict):
+    W = np.zeros((len(loc_dict), len(loc_dict)))
+    AngleMatrix = np.zeros((len(loc_dict), len(loc_dict)))
+    locations = list(loc_dict.keys())
+
+    for i in range(len(loc_dict)):
+        for j in range(len(loc_dict)):
+            if i != j:
+                theta = get_bearing(loc_dict[locations[i]], loc_dict[locations[j]])
+                W[i, j] = 1 / great_circle(loc_dict[locations[i]], loc_dict[locations[j]]).km
+                AngleMatrix[i, j] = theta
+            else:
+                W[i, j] = 0
+
+    return W, AngleMatrix
+
+
+def wind_tensor(pol, angle, wind, W_matrix, AngleMatrix):
+    WW = np.zeros((len(angle), len(angle.columns), len(angle.columns)))
+    WWY = np.zeros((len(angle), len(pol.columns)))
+
+    for i in tqdm(range(len(angle))):
+        time_angle = angle.iloc[i, :].to_numpy().reshape(len(angle.columns), 1)
+        time_speed = wind.iloc[i, :].to_numpy().reshape(len(angle.columns), 1)
+        WW[i, :, :] = np.cos(AngleMatrix - time_angle[np.newaxis, :]) * time_speed[np.newaxis, :] * W_matrix
+        WWY[i, :] = np.matmul(WW[i, :, :], pol.iloc[i, :].to_numpy())
+
+    return WWY, WW
+
+
+def main() -> None:
+    filepath_cleaned = "/Users/main/Vault/Thesis/Code/Data/Cleaned_data.csv"
+    filepath_pol = "/Users/main/Vault/Thesis/Code/Data/pollution.csv"
+    filepath_speed = "/Users/main/Vault/Thesis/Code/Data/wind_speed.csv"
+    filepath_angle = "/Users/main/Vault/Thesis/Code/Data/wind_angle.csv"
+    geographical = "municipality"
+
+    df_gen, df_pol, df_speed, df_angle = get_data(filepath_cleaned, filepath_pol, filepath_speed, filepath_angle)
+    coordinates = coordinate_dict(df_gen, geographical, df_pol)
+    weight_matrix, angle_matrix = weight_angle_matrix(coordinates)
+    spillover_matrix, tensor_W = wind_tensor(df_pol, df_angle, df_speed, weight_matrix, angle_matrix)
+    spillover_matrix = pd.DataFrame(spillover_matrix)
+    spillover_matrix.set_index(df_pol.index, inplace=True)
+
+    np.save("/Users/main/Vault/Thesis/Code/Data/tensor_W.npy", tensor_W)
+    spillover_matrix.to_csv('/Users/main/Vault/Thesis/Code/Data/spillover_effects.csv')
+    return None
+
+
+if __name__ == "__main__":
+    main()

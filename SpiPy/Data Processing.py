@@ -3,6 +3,13 @@ import numpy as np
 import math
 
 
+def angle_correction(angle):
+    if angle > 360:
+        angle -= 360
+        angle = angle_correction(angle)
+    return angle
+
+
 def get_data(filepath: str):
     """
     This is a temporal function while using a snapshot of the data being gathered by
@@ -27,10 +34,13 @@ def format_data(df):
             'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
             'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
             axis=1, inplace=True)
+
     for row in df.itertuples():
-        while row.DD > 360:
-            row.DD -= 360
-    df.rename(columns={"DD": " Wind Angle", "FH": "Wind Speed"}, inplace=True)
+        index, DD_value = row.Index, row.DD
+        df.at[index, 'DD'] = angle_correction(row.DD)
+
+    df.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
+
     return df
 
 
@@ -57,6 +67,7 @@ def group_data(df, geo_level: str, time_interval: str):
     grouped_df["Date"] = pd.to_datetime(grouped_df[time_group].astype(str))
     grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
     grouped_df.set_index("Date", inplace=True)
+
     return grouped_df
 
 
@@ -66,7 +77,7 @@ def main() -> None:
     time_level = "hours"
     data = group_data(format_data(get_data(path)), geographical_level, time_level)
     data.to_csv('/Users/main/Vault/Thesis/Code/Data/Cleaned_data.csv')
-    return
+    return None
 
 
 if __name__ == "__main__":

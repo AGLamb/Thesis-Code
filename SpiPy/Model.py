@@ -1,18 +1,36 @@
-from statsmodels.tsa.stattools import adfuller, coint
-from statsmodels.tsa.vector_ar.vecm import coint_johansen
-from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
-from statsmodels.tsa.api import AutoReg, VAR, VARMAX
+from statsmodels.tsa.api import AutoReg, VAR
 import sklearn.metrics as skm
 import pandas as pd
+import numpy as np
 
 
-#
-# WWY_lagged = np.roll(WWY, 1, axis=0)
-# WWY_lagged[0, :] = 0
-#
-# SWVAR = VAR(filtered_pol, exog=WWY_lagged).fit(maxlags=1, trend='c')
-# # print(SWVAR.summary())
-#
-# for key in LocDict:
-#     R2 = skm.r2_score(SWVAR.fittedvalues[key] + SWVAR.resid[key], SWVAR.fittedvalues[key])
-#     print(f'The R-Squared of {key} is: {R2 * 100:.2f}%')
+def spatial_VAR(endog_df, spillover_matrix):
+    lagged_spillover = np.roll(spillover_matrix, 1, axis=0)
+    lagged_spillover[0, :] = 0
+
+    spatialVAR = VAR(endog_df, exog=lagged_spillover).fit(maxlags=1, trend='c')
+    print(spatialVAR.summary())
+    return spatialVAR
+
+
+def get_R2(model, location_dict):
+    for key in location_dict:
+        R2 = skm.r2_score(model.fittedvalues[key] + model.resid[key], model.fittedvalues[key])
+        print(f'The R-Squared of {key} is: {R2 * 100:.2f}%')
+    return
+
+
+def spatial_data(path_data: str, path_spill: str):
+    return pd.read_csv(path_data, index_col=0), pd.read_csv(path_spill, index_col=0)
+
+
+def main() -> None:
+    filepath_pol = "/Users/main/Vault/Thesis/Code/Data/pollution.csv"
+    filepath_spill = "/Users/main/Vault/Thesis/Code/Data/spillover_effects.csv"
+    df_pol, WWY = spatial_data(filepath_pol, filepath_spill)
+    spatial_VAR(df_pol, WWY)
+    return None
+
+
+if __name__ == "__main__":
+    main()

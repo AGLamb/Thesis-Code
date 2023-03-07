@@ -49,9 +49,9 @@ def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
     return spillover_matrix
 
 
-def Part4(pollution: pd.DataFrame, WWY: pd.DataFrame, geo_lev: str, time_lev: str) -> VAR:
+def Part4(pollution: pd.DataFrame, WWY: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> VAR:
     # filepath_pol = "./Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv"
-    # filepath_spill = "./Data/" + time_lev + "/" + geo_lev + "/" + "spillover_effects.csv"
+    # filepath_spill = "./Data/" + time_lev + "/" + geo_lev + "/" + "spillover_effects" + tensor_typ + ".csv"
     # df_pol, WWY = SpatialRegression.spatial_data(filepath_pol, filepath_spill)
 
     spatial_model = SpatialRegression.spatial_VAR(pollution, WWY)

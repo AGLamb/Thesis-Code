@@ -4,6 +4,10 @@ import math
 
 
 def angle_correction(angle) -> int:
+    """
+    :param angle:
+    :return:
+    """
     if angle > 360:
         angle -= 360
         angle = angle_correction(angle)

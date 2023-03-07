@@ -8,6 +8,13 @@ np.random.seed(123)
 
 
 def random_walk(df: int, sigma: str, geo_lev: str, time_lev: str) -> np.array:
+    """
+    :param df:
+    :param sigma:
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
     T = len(pollution)
@@ -24,6 +31,12 @@ def random_walk(df: int, sigma: str, geo_lev: str, time_lev: str) -> np.array:
 
 
 def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
+    """
+    :param lags:
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
     output_models = []
@@ -34,6 +47,12 @@ def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
 
 
 def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
+    """
+    :param filepath:
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     tensor = "wind"
 
     clean_df = Part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
@@ -44,6 +63,12 @@ def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
 
 
 def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
+    """
+    :param filepath:
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     tensor = "space"
 
     clean_df = Part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
@@ -54,6 +79,11 @@ def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
 
 
 def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
+    """
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
     model = VAR(pollution).fit(maxlags=1)
@@ -61,6 +91,11 @@ def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
 
 
 def create_set(geo_lev: str, time_lev: str) -> list:
+    """
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     path = "/Users/main/Vault/Thesis/Data/Core/train_data.csv"
     return [SWVAR(path, geo_lev=geo_lev, time_lev=time_lev),
             SVAR(path, geo_lev=geo_lev, time_lev=time_lev),

@@ -6,6 +6,11 @@ import numpy as np
 
 
 def spatial_VAR(pollution, spillover_matrix) -> VAR:
+    """
+    :param pollution:
+    :param spillover_matrix:
+    :return:
+    """
     lagged_spillover = spillover_matrix.shift(1)
     lagged_spillover.at[spillover_matrix.index[0], :] = 0
     spatialVAR = VAR(pollution, exog=lagged_spillover).fit(maxlags=1, trend='c')
@@ -13,6 +18,11 @@ def spatial_VAR(pollution, spillover_matrix) -> VAR:
 
 
 def get_R2(model, location_dict) -> None:
+    """
+    :param model:
+    :param location_dict:
+    :return:
+    """
     for key in location_dict:
         R2 = skm.r2_score(model.fittedvalues[key] + model.resid[key], model.fittedvalues[key])
         print(f'The R-Squared of {key} is: {R2 * 100:.2f}%')
@@ -20,4 +30,9 @@ def get_R2(model, location_dict) -> None:
 
 
 def spatial_data(path_data: str, path_spill: str) -> pd.DataFrame:
+    """
+    :param path_data:
+    :param path_spill:
+    :return:
+    """
     return pd.read_csv(path_data, index_col=0), pd.read_csv(path_spill, index_col=0)

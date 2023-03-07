@@ -3,11 +3,21 @@ import numpy as np
 
 
 def get_clean_data(path: str) -> pd.DataFrame:
+    """
+    :param path:
+    :return:
+    """
     return pd.read_csv(path, index_col=0)
 
 
 def matrix_creator(input_df: pd.DataFrame, geo_level: str,
                    faulty: list) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    """
+    :param input_df:
+    :param geo_level:
+    :param faulty:
+    :return:
+    """
 
     if geo_level == "street":
         geo_att = "name"
@@ -44,6 +54,11 @@ def matrix_creator(input_df: pd.DataFrame, geo_level: str,
 
 
 def delete_sensors(df_input: pd.DataFrame, pop_sensors: list) -> pd.DataFrame:
+    """
+    :param df_input:
+    :param pop_sensors:
+    :return:
+    """
     if len(pop_sensors) > 0:
         df = df_input.copy()
         df.drop(columns=pop_sensors, inplace=True)

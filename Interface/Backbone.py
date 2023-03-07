@@ -5,12 +5,23 @@ import numpy as np
 
 
 def Part1(filepath: str, geo_lev: str, time_lev: str) -> pd.DataFrame:
+    """
+    :param filepath:
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     data = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(filepath)), geo_lev, time_lev)
     data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv")
     return data
 
 
 def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
+    """
+    :param geo_lev:
+    :param time_lev:
+    :return:
+    """
     filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
     data = Separator.get_clean_data(filepath)
 
@@ -27,6 +38,16 @@ def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFr
 
 def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
           df_angle: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> pd.DataFrame:
+    """
+    :param df_gen:
+    :param df_pol:
+    :param df_speed:
+    :param df_angle:
+    :param geo_lev:
+    :param time_lev:
+    :param tensor_typ:
+    :return:
+    """
     # filepath_cleaned = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
     # filepath_pol = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv"
     # filepath_speed = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_speed.csv"
@@ -54,6 +75,14 @@ def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
 
 
 def Part4(pollution: pd.DataFrame, WWY: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> VAR:
+    """
+    :param pollution:
+    :param WWY:
+    :param geo_lev:
+    :param time_lev:
+    :param tensor_typ:
+    :return:
+    """
     # filepath_pol = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv"
     # filepath_spill = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev +
     #                   "/" + "spillover_effects" + tensor_typ + ".csv"

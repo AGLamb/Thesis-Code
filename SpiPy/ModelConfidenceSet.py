@@ -28,6 +28,11 @@ def bootstrap_sample(data, B, w):
 
 
 def compute_dij(losses, bs_data):
+    """
+    :param losses:
+    :param bs_data:
+    :return:
+    """
     """Compute the loss difference"""
     t, M0 = losses.shape
     B = bs_data.shape[1]
@@ -48,6 +53,12 @@ def compute_dij(losses, bs_data):
 
 
 def calculate_PvalR(z, included, z_data_0):
+    """
+    :param z:
+    :param included:
+    :param z_data_0:
+    :return:
+    """
     """Calculate the p-value of relative algorithm"""
     emp_dist_TR = np.max(np.max(np.abs(z), 2), 1)
     z_data = z_data_0[ix_(included - 1, included - 1)]
@@ -57,6 +68,12 @@ def calculate_PvalR(z, included, z_data_0):
 
 
 def calculate_PvalSQ(z, included, z_data_0):
+    """
+    :param z:
+    :param included:
+    :param z_data_0:
+    :return:
+    """
     """Calculate the p-value of sequential algorithm"""
     emp_dist_TSQ = np.sum(z ** 2, axis=1).sum(axis=1) / 2
     z_data = z_data_0[ix_(included - 1, included - 1)]
@@ -66,6 +83,14 @@ def calculate_PvalSQ(z, included, z_data_0):
 
 
 def iterate(d_ij_bar, d_ij_bar_star, var_d_ij_bar, alpha, algorithm="R"):
+    """
+    :param d_ij_bar:
+    :param d_ij_bar_star:
+    :param var_d_ij_bar:
+    :param alpha:
+    :param algorithm:
+    :return:
+    """
     """Iteratively excluding inferior model"""
     B, M0, _ = d_ij_bar_star.shape
     z0 = (d_ij_bar_star - np.expand_dims(d_ij_bar, 0)) / np.sqrt(
@@ -111,6 +136,14 @@ def iterate(d_ij_bar, d_ij_bar_star, var_d_ij_bar, alpha, algorithm="R"):
 
 
 def MCS(losses, alpha, B, w, algorithm):
+    """
+    :param losses:
+    :param alpha:
+    :param B:
+    :param w:
+    :param algorithm:
+    :return:
+    """
     """Main function of the MCS"""
     t, M0 = losses.shape
     bs_data = bootstrap_sample(np.arange(t), B, w)
@@ -184,6 +217,9 @@ class ModelConfidenceSet(object):
         self.algorithm = algorithm
 
     def run(self):
+        """
+        :return:
+        """
         included, excluded, p_values = MCS(
             self.data, self.alpha, self.B, self.w, self.algorithm
         )

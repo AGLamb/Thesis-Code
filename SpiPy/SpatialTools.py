@@ -6,6 +6,11 @@ import math
 
 
 def get_bearing(coor1, coor2) -> float:
+    """
+    :param coor1:
+    :param coor2:
+    :return:
+    """
     dLon = (coor2[1] - coor1[1])
     y = math.sin(dLon) * math.cos(coor2[0])
     x = math.cos(coor1[0]) * math.sin(coor2[0]) - math.sin(coor1[0]) * math.cos(coor2[0]) * math.cos(dLon)
@@ -15,6 +20,13 @@ def get_bearing(coor1, coor2) -> float:
 
 
 def get_data(path_df, path_pol, path_angle, path_wind) -> pd.DataFrame:
+    """
+    :param path_df:
+    :param path_pol:
+    :param path_angle:
+    :param path_wind:
+    :return:
+    """
     df = pd.read_csv(path_df, index_col=0)
     pol = pd.read_csv(path_pol, index_col=0)
     angle = pd.read_csv(path_angle, index_col=0)
@@ -23,6 +35,12 @@ def get_data(path_df, path_pol, path_angle, path_wind) -> pd.DataFrame:
 
 
 def coordinate_dict(df, geo_level, pol):
+    """
+    :param df:
+    :param geo_level:
+    :param pol:
+    :return:
+    """
     if geo_level == "street":
         geo_att = "name"
     else:
@@ -39,6 +57,10 @@ def coordinate_dict(df, geo_level, pol):
 
 
 def weight_angle_matrix(loc_dict) -> np.ndarray:
+    """
+    :param loc_dict:
+    :return:
+    """
     W = np.zeros((len(loc_dict), len(loc_dict)))
     AngleMatrix = np.zeros((len(loc_dict), len(loc_dict)))
     locations = list(loc_dict.keys())
@@ -59,6 +81,15 @@ def weight_angle_matrix(loc_dict) -> np.ndarray:
 
 def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
                    W_matrix: np.ndarray, AngleMatrix: np.ndarray, tensor_type: str) -> (pd.DataFrame, np.ndarray):
+    """
+    :param pol:
+    :param angle:
+    :param wind:
+    :param W_matrix:
+    :param AngleMatrix:
+    :param tensor_type:
+    :return:
+    """
 
     if tensor_type == "wind":
         WW = np.zeros((len(angle), len(angle.columns), len(angle.columns)))

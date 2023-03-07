@@ -19,7 +19,7 @@ def get_data(filepath: str) -> pd.DataFrame:
     :param filepath: Local filepath to the raw dataset
     :return: Pandas DataFrame with the raw data
     """
-    return pd.read_csv(filepath)
+    return pd.read_csv(filepath, index_col=0)
 
 
 def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
@@ -57,14 +57,19 @@ def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
     else:
         geo_group = "tag"
 
-    if time_interval == "days":
+    if time_interval == "day":
         time_group = "YYYYMMDD"
     else:
         time_group = "timestamp"
 
     grouped_df = df.groupby(by=[geo_group, time_group]).median().copy().reset_index()
     grouped_df["Date"] = pd.to_datetime(grouped_df[time_group].astype(str))
-    grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
+
+    if time_interval == "day":
+        grouped_df.drop(columns=["YYYYMMDD"], inplace=True)
+    else:
+        grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
+
     grouped_df.set_index("Date", inplace=True)
 
     return grouped_df

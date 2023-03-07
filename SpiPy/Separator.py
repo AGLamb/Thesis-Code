@@ -25,13 +25,13 @@ def matrix_creator(input_df: pd.DataFrame, geo_level: str,
     df_angle.rename(columns={"Wind Angle": UniqueNames[0]}, inplace=True)
 
     for i in range(1, len(UniqueNames)):
-        df_pol = df_pol.combine_first(pd.DataFrame(df.loc[df["tag"] == UniqueNames[i], "pm25"]))
+        df_pol = df_pol.combine_first(pd.DataFrame(df.loc[df[geo_att] == UniqueNames[i], "pm25"]))
         df_pol.rename(columns={"pm25": UniqueNames[i]}, inplace=True)
 
-        df_wind = df_wind.combine_first(pd.DataFrame(df.loc[df["tag"] == UniqueNames[i], "Wind Speed"]))
+        df_wind = df_wind.combine_first(pd.DataFrame(df.loc[df[geo_att] == UniqueNames[i], "Wind Speed"]))
         df_wind.rename(columns={"Wind Speed": UniqueNames[i]}, inplace=True)
 
-        df_angle = df_angle.combine_first(pd.DataFrame(df.loc[df["tag"] == UniqueNames[i], "Wind Angle"]))
+        df_angle = df_angle.combine_first(pd.DataFrame(df.loc[df[geo_att] == UniqueNames[i], "Wind Angle"]))
         df_angle.rename(columns={"Wind Angle": UniqueNames[i]}, inplace=True)
 
     for column in df_pol:
@@ -44,6 +44,9 @@ def matrix_creator(input_df: pd.DataFrame, geo_level: str,
 
 
 def delete_sensors(df_input: pd.DataFrame, pop_sensors: list) -> pd.DataFrame:
-    df = df_input.copy()
-    df.drop(columns=pop_sensors, inplace=True)
-    return df
+    if len(pop_sensors) > 0:
+        df = df_input.copy()
+        df.drop(columns=pop_sensors, inplace=True)
+        return df
+    else:
+        return df_input

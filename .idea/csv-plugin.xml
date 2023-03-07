@@ -3,28 +3,21 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="/Data/pollution.csv">
+        <entry key="/Data/Core/test_data.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="/Data/spillover_effects.csv">
+        <entry key="/Data/Core/train_data.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="/Data/wind_angle.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="/Data/wind_speed.csv">
+        <entry key="/Data/day/municipality/Cleaned_data.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

@@ -1,38 +1,23 @@
-from SpiPy import DataPrep, Separator, SpatialTools, SpatialRegression, ModelConfidenceSet
-from statsmodels.tsa.api import VAR
-import pandas as pd
-import numpy as np
-import Template
-
-
-def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
-    tensor = "wind"
-
-    clean_df = Part1(filepath, geo_lev, time_lev)
-    pollution, w_speed, w_angle = Part2(geographical_level, time_level)
-    spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geographical_level, time_level, tensor)
-    SVAR_Model = Part4(pollution, spillover_df, geographical_level, time_level)
-    return SVAR_Model
-
-
-def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
-    tensor = "space"
-
-    clean_df = Part1(filepath, geo_lev, time_lev)
-    pollution, w_speed, w_angle = Part2(geographical_level, time_level)
-    spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geographical_level, time_level, tensor)
-    SVAR_Model = Part4(pollution, spillover_df, geographical_level, time_level)
-    return SVAR_Model
+from Interface.ModelProd import create_set
+import time
 
 
 def main():
-    path = '/Users/main/Vault/Thesis/Data/pm25_weer.csv'
-    geographical_level = "municipality"
-    time_level = "hours"
 
-    model_SWVAR = SWVAR(path, geographical_level, time_level)
-    model_SVAR = SVAR(path, geographical_level, time_level)
-    print(model_SWVAR.summary(), "\n", model_SVAR.summary())
+    start_time = time.time()
+    mun_level = "municipality"
+    street_level = "street"
+
+    hour_interval = "hours"
+    day_interval = "day"
+
+    set_m_h = create_set(mun_level, hour_interval)
+    set_m_d = create_set(mun_level, day_interval)
+    set_s_h = create_set(street_level, hour_interval)
+    set_s_d = create_set(street_level, day_interval)
+
+    end_time = time.time()
+    print("Time taken: ", end_time - start_time, "seconds")
     return
 
 

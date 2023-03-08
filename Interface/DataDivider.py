@@ -3,16 +3,13 @@ import pandas as pd
 
 def get_data(path: str) -> pd.DataFrame:
     """
-    :param path:
-    :return:
+    :param path: filepath to the raw data
+    :return: dataframe with raw data
     """
     return pd.read_csv(path)
 
 
 def main():
-    """
-    :return:
-    """
     path = '/Users/main/Vault/Thesis/Data/pm25_weer.csv'
     df = get_data(path)
 

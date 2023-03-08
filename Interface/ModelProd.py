@@ -9,11 +9,11 @@ np.random.seed(123)
 
 def random_walk(df: int, sigma: str, geo_lev: str, time_lev: str) -> np.array:
     """
-    :param df:
-    :param sigma:
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param df: degrees of freedom
+    :param sigma: variance of the error term
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: matrix with simulated random walk
     """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
@@ -32,10 +32,10 @@ def random_walk(df: int, sigma: str, geo_lev: str, time_lev: str) -> np.array:
 
 def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
     """
-    :param lags:
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param lags: number of lags to include in the model
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: list of AR models for each geographical location
     """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
@@ -48,10 +48,10 @@ def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
 
 def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
     """
-    :param filepath:
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param filepath: filepath to the raw data
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: VAR model with wind
     """
     tensor = "wind"
 
@@ -64,10 +64,10 @@ def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
 
 def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
     """
-    :param filepath:
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param filepath: filepath to the raw data
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: VAR model without wind
     """
     tensor = "space"
 
@@ -80,9 +80,9 @@ def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
 
 def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
     """
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: VAR model without spatial variables
     """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
@@ -92,9 +92,9 @@ def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
 
 def create_set(geo_lev: str, time_lev: str) -> list:
     """
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: set of models
     """
     path = "/Users/main/Vault/Thesis/Data/Core/train_data.csv"
     return [SWVAR(path, geo_lev=geo_lev, time_lev=time_lev),

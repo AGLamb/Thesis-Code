@@ -3,9 +3,6 @@ import time
 
 
 def main():
-    """
-    :return:
-    """
 
     start_time = time.time()
     mun_level = "municipality"

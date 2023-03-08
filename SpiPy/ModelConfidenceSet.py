@@ -29,7 +29,7 @@ def bootstrap_sample(data, B, w):
 
 def compute_dij(losses, bs_data):
     """
-    :param losses:
+    :param losses: self-explanatory
     :param bs_data:
     :return:
     """
@@ -138,10 +138,10 @@ def iterate(d_ij_bar, d_ij_bar_star, var_d_ij_bar, alpha, algorithm="R"):
 def MCS(losses, alpha, B, w, algorithm):
     """
     :param losses:
-    :param alpha:
-    :param B:
-    :param w:
-    :param algorithm:
+    :param alpha: alpha level for the test
+    :param B: boostrap size
+    :param w: block length of the boostrap
+    :param algorithm: algo to be used. Can  be R or SQ
     :return:
     """
     """Main function of the MCS"""
@@ -217,9 +217,6 @@ class ModelConfidenceSet(object):
         self.algorithm = algorithm
 
     def run(self):
-        """
-        :return:
-        """
         included, excluded, p_values = MCS(
             self.data, self.alpha, self.B, self.w, self.algorithm
         )

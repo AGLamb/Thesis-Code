@@ -6,10 +6,10 @@ import numpy as np
 
 def Part1(filepath: str, geo_lev: str, time_lev: str) -> pd.DataFrame:
     """
-    :param filepath:
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param filepath: local filepath to the raw dataset
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: grouped data at the desired geographical level and time interval
     """
     data = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(filepath)), geo_lev, time_lev)
     data.to_csv("../Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv")
@@ -18,9 +18,9 @@ def Part1(filepath: str, geo_lev: str, time_lev: str) -> pd.DataFrame:
 
 def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
     """
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: separated dataframes for each variable
     """
     filepath = "../Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
     data = Separator.get_clean_data(filepath)
@@ -36,14 +36,14 @@ def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFr
 def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
           df_angle: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> pd.DataFrame:
     """
-    :param df_gen:
-    :param df_pol:
-    :param df_speed:
-    :param df_angle:
-    :param geo_lev:
-    :param time_lev:
-    :param tensor_typ:
-    :return:
+    :param df_gen: clean dataset
+    :param df_pol: dataset with pollution data
+    :param df_speed: dataset with wind speed
+    :param df_angle:dataset with wind direction
+    :param geo_lev: granularity of geographical divison
+    :param time_lev: granularity of time interval
+    :param tensor_typ: conditional that determines if to include wind varibles in the calculations
+    :return: spatial spillover dataframe
     """
     # filepath_cleaned = "./Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
     # filepath_pol = "./Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv"
@@ -72,12 +72,12 @@ def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
 
 def Part4(pollution: pd.DataFrame, WWY: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> VAR:
     """
-    :param pollution:
-    :param WWY:
-    :param geo_lev:
-    :param time_lev:
-    :param tensor_typ:
-    :return:
+    :param pollution: dataset with the pollution levels
+    :param WWY: dataset with the spatial spillover effects
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time intervals
+    :param tensor_typ: conditional that determines if to include wind varibles in the calculations
+    :return: VAR model
     """
     # filepath_pol = "./Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv"
     # filepath_spill = "./Data/" + time_lev + "/" + geo_lev + "/" + "spillover_effects" + tensor_typ + ".csv"

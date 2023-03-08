@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-import math
 
 
 def angle_correction(angle) -> int:
@@ -39,8 +37,9 @@ def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
             axis=1, inplace=True)
 
     for row in df.itertuples():
-        index, DD_value = row.Index, row.DD
-        df.at[index, 'DD'] = angle_correction(row.DD)
+        index = row.index
+        DD_value: int = row['DD']
+        df.at[index, 'DD'] = angle_correction(DD_value)
 
     df.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
 

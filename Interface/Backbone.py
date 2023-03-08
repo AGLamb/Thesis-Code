@@ -1,5 +1,6 @@
 from SpiPy import DataPrep, Separator, SpatialTools, SpatialRegression, ModelConfidenceSet
 from statsmodels.tsa.api import VAR
+from statsmodels.tsa.vector_ar.var_model import VARResults
 import pandas as pd
 import numpy as np
 
@@ -74,10 +75,11 @@ def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
     return spillover_matrix
 
 
-def Part4(pollution: pd.DataFrame, WWY: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> VAR:
+def Part4(pollution: pd.DataFrame, spillovers: pd.DataFrame,
+          geo_lev: str, time_lev: str, tensor_typ: str) -> VARResults:
     """
     :param pollution: dataset with pollution levels
-    :param WWY: dataset with spatial spillover effects
+    :param spillovers: dataset with spatial spillover effects
     :param geo_lev: granularity of the geographical division
     :param time_lev: granularity of the time interval
     :param tensor_typ: conditional to include the wind variables in the calculations
@@ -88,6 +90,6 @@ def Part4(pollution: pd.DataFrame, WWY: pd.DataFrame, geo_lev: str, time_lev: st
     #                   "/" + "spillover_effects" + tensor_typ + ".csv"
     # df_pol, WWY = SpatialRegression.spatial_data(filepath_pol, filepath_spill)
 
-    spatial_model = SpatialRegression.spatial_VAR(pollution, WWY)
+    spatial_model = SpatialRegression.spatial_VAR(pollution, spillovers)
     print(spatial_model.test_normality(signif=0.05).summary())
     return spatial_model

@@ -1,13 +1,14 @@
+from statsmodels.tsa.vector_ar.var_model import VARResults
+
 from Interface.Backbone import Part1, Part2, Part3, Part4
 from statsmodels.tsa.api import VAR, AutoReg
-import pandas as pd
 import numpy as np
 
 
 np.random.seed(123)
 
 
-def random_walk(df: int, sigma: str, geo_lev: str, time_lev: str) -> np.array:
+def random_walk(df: int, sigma: float, geo_lev: str, time_lev: str) -> np.array:
     """
     :param df: degrees of freedom
     :param sigma: variance of the error term
@@ -46,7 +47,7 @@ def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
     return output_models
 
 
-def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
+def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VARResults:
     """
     :param filepath: filepath to the raw data
     :param geo_lev: granularity of the geographical division
@@ -58,11 +59,11 @@ def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
     clean_df = Part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
     spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
-    SVAR_Model = Part4(pollution, spillover_df, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
-    return SVAR_Model
+    SWVAR_Model: VARResults = Part4(pollution, spillover_df, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
+    return SWVAR_Model
 
 
-def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
+def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VARResults:
     """
     :param filepath: filepath to the raw data
     :param geo_lev: granularity of the geographical division
@@ -74,11 +75,11 @@ def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
     clean_df = Part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
     spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
-    SVAR_Model = Part4(pollution, spillover_df, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
+    SVAR_Model: VARResults = Part4(pollution, spillover_df, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
     return SVAR_Model
 
 
-def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
+def standard_VAR(geo_lev: str, time_lev: str) -> VARResults:
     """
     :param geo_lev: granularity of the geographical division
     :param time_lev: granularity of the time interval

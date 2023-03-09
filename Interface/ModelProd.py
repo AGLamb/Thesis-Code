@@ -81,7 +81,8 @@ def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
 
     clean_df = Part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
-    spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
+    spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev,
+                         time_lev=time_lev, tensor_typ=tensor)
     SVAR_Model = Part4(pollution, spillover_df, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
 
     return SVAR_Model

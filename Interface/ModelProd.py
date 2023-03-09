@@ -7,7 +7,7 @@ import numpy as np
 np.random.seed(123)
 
 
-def random_walk(df: int, sigma: str, geo_lev: str, time_lev: str) -> np.array:
+def random_walk(sigma: str, geo_lev: str, time_lev: str) -> np.array:
     """
     :param df:
     :param sigma:
@@ -15,6 +15,12 @@ def random_walk(df: int, sigma: str, geo_lev: str, time_lev: str) -> np.array:
     :param time_lev:
     :return:
     """
+
+    if geo_lev == "street":
+        df = 170
+    else:
+        df = 14
+
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
     T = len(pollution)
@@ -39,10 +45,10 @@ def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
     """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
-    output_models = []
+    output_models = {}
     for column in pollution:
-        mod = AutoReg(pollution[column], lags=lags).fit()
-        output_models.append(mod)
+        output_models[column] = AutoReg(pollution[column], lags=lags, trend='c').fit()
+
     return output_models
 
 
@@ -57,8 +63,10 @@ def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
 
     clean_df = Part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
-    spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
+    spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev,
+                         time_lev=time_lev, tensor_typ=tensor)
     SVAR_Model = Part4(pollution, spillover_df, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
+
     return SVAR_Model
 
 
@@ -75,6 +83,7 @@ def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
     spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
     SVAR_Model = Part4(pollution, spillover_df, geo_lev=geo_lev, time_lev=time_lev, tensor_typ=tensor)
+
     return SVAR_Model
 
 
@@ -86,7 +95,7 @@ def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
     """
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
 
-    model = VAR(pollution).fit(maxlags=1)
+    model = VAR(pollution).fit(maxlags=1, trend='c')
     return model
 
 
@@ -97,8 +106,9 @@ def create_set(geo_lev: str, time_lev: str) -> list:
     :return:
     """
     path = "/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-    return [SWVAR(path, geo_lev=geo_lev, time_lev=time_lev),
-            SVAR(path, geo_lev=geo_lev, time_lev=time_lev),
-            standard_VAR(geo_lev=geo_lev, time_lev=time_lev),
-            AR_model(lags=1, geo_lev=geo_lev, time_lev=time_lev),
-            random_walk(df=14, sigma=1, geo_lev=geo_lev, time_lev=time_lev)]
+
+    return {"SWVAR(1) Model": SWVAR(path, geo_lev=geo_lev, time_lev=time_lev),
+            "SVAR(1) Model": SVAR(path, geo_lev=geo_lev, time_lev=time_lev),
+            "VAR(1) Model": standard_VAR(geo_lev=geo_lev, time_lev=time_lev),
+            "AR(1) Models": AR_model(lags=1, geo_lev=geo_lev, time_lev=time_lev),
+            "Random Walk": random_walk(sigma=1, geo_lev=geo_lev, time_lev=time_lev)}

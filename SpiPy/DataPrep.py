@@ -21,7 +21,7 @@ def get_data(filepath: str) -> pd.DataFrame:
     :param filepath: Local filepath to the raw dataset
     :return: Pandas DataFrame with the raw data
     """
-    return pd.read_csv(filepath, index_col=0)
+    return pd.read_csv(filepath)
 
 
 def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
@@ -36,10 +36,8 @@ def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
             'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
             axis=1, inplace=True)
 
-    for row in df.itertuples():
-        index = row.index
-        DD_value: int = row['DD']
-        df.at[index, 'DD'] = angle_correction(DD_value)
+    for i in range(len(df)):
+        df.at[i, 'DD'] = angle_correction(df.at[i, 'DD'])
 
     df.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
 

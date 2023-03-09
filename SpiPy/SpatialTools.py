@@ -1,4 +1,8 @@
+from typing import Tuple, Any
+
 from geopy.distance import great_circle
+from numpy import ndarray
+from pandas import DataFrame
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
@@ -19,7 +23,8 @@ def get_bearing(coor1, coor2) -> float:
     return brng
 
 
-def get_data(path_df, path_pol, path_angle, path_wind) -> pd.DataFrame:
+def get_data(path_df, path_pol, path_angle, path_wind) -> tuple[
+    DataFrame | Any, DataFrame | Any, DataFrame | Any, DataFrame | Any]:
     """
     :param path_df: filepath to the clean data
     :param path_pol: filepath to the pollution data
@@ -56,7 +61,7 @@ def coordinate_dict(df, geo_level, pol):
     return c_dict
 
 
-def weight_angle_matrix(loc_dict) -> np.ndarray:
+def weight_angle_matrix(loc_dict) -> tuple[ndarray, ndarray]:
     """
     :param loc_dict: Dictionary with location names and corresponding coordinates
     :return: Two matrices, one that contains the inverse of the distance between two points,

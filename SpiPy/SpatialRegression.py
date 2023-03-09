@@ -1,20 +1,23 @@
+from typing import Tuple, Any
+from pandas import DataFrame
 from statsmodels.tsa.api import AutoReg, VAR
 import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 import pandas as pd
 import numpy as np
+from statsmodels.tsa.vector_ar.var_model import VARResults
 
 
-def spatial_VAR(pollution, spillover_matrix) -> VAR:
+def spatial_VAR(pollution, spillover_matrix) -> VARResults:
     """
     :param pollution: dataset with the pollution levels
     :param spillover_matrix: dataset with the pollution spillovers from adjacent locations
     :return: VAR model
     """
     lagged_spillover = spillover_matrix.shift(1)
-    lagged_spillover.at[spillover_matrix.index[0], :] = 0
-    spatialVAR = VAR(pollution, exog=lagged_spillover).fit(maxlags=1, trend='c')
-    return spatialVAR
+    lagged_spillover.at[0, :] = 0
+    spatial_VAR = VAR(pollution, exog=lagged_spillover).fit(maxlags=1, trend='c')
+    return spatial_VAR
 
 
 def get_R2(model, location_dict) -> None:
@@ -29,7 +32,7 @@ def get_R2(model, location_dict) -> None:
     return None
 
 
-def spatial_data(path_data: str, path_spill: str) -> pd.DataFrame:
+def spatial_data(path_data: str, path_spill: str) -> tuple[DataFrame | Any, DataFrame | Any]:
     """
     :param path_data: filepath to the pollution data
     :param path_spill: filepath to the spillove data

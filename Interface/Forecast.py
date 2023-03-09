@@ -1,3 +1,6 @@
+from typing import Dict, Any, Tuple
+from numpy import ndarray
+from pandas import DataFrame
 from statsmodels.tsa.vector_ar.var_model import VARResults
 from Interface.Backbone import Part1, Part2, Part3
 from statsmodels.tsa.api import VAR
@@ -5,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 
-def get_performance(input_set: list, geo_lev: str, time_lev: str) -> list:
+def get_performance(input_set: Any, geo_lev: str, time_lev: str) -> dict[str, ndarray | Any]:
     tensor_w = "wind"
     no_tensor = "space"
     path = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
@@ -103,7 +106,7 @@ def SWVAR_forecast(VAR_mod: VARResults, pollution: pd.DataFrame, time_lev: str, 
     return pollution - pred
 
 
-def get_test_data(filepath: str, geo_lev: str, time_lev: str, tensor_type: str) -> pd.DataFrame:
+def get_test_data(filepath: str, geo_lev: str, time_lev: str, tensor_type: str) -> tuple[Any, DataFrame]:
     clean_df = Part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
     pollution, w_speed, w_angle = Part2(geo_lev=geo_lev, time_lev=time_lev)
     spillover_df = Part3(clean_df, pollution, w_speed, w_angle, geo_lev=geo_lev,

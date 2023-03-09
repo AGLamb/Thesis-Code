@@ -1,6 +1,6 @@
 from SpiPy import DataPrep, Separator, SpatialTools, SpatialRegression, ModelConfidenceSet
 from statsmodels.tsa.api import VAR
-from statsmodels.tsa.vector_ar.var_model import VARResults
+from statsmodels.tsa.vector_ar.var_model import VARResults, VAR
 import pandas as pd
 import numpy as np
 
@@ -13,7 +13,8 @@ def Part1(filepath: str, geo_lev: str, time_lev: str) -> pd.DataFrame:
     :return: dataframe with the clean data
     """
     data = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(filepath)), geo_lev, time_lev)
-    data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv")
+    # data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv")
+    data.to_csv("Cleaned_data.csv")
     return data
 
 
@@ -23,7 +24,8 @@ def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFr
     :param time_lev: granularity of the time interval
     :return: individual dataframes for each variable
     """
-    filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
+    # filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
+    filepath = r"Cleaned_data.csv"
     data = Separator.get_clean_data(filepath)
 
     if geo_lev == "municipality":
@@ -31,9 +33,9 @@ def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFr
     else:
         no_sensors = []
     pollution, w_speed, w_angle = Separator.matrix_creator(data, geo_lev, no_sensors)
-    pollution.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv")
-    w_speed.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_speed.csv")
-    w_angle.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_angle.csv")
+    # pollution.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv")
+    # w_speed.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_speed.csv")
+    # w_angle.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_angle.csv")
     return pollution, w_speed, w_angle
 
 
@@ -65,13 +67,13 @@ def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
         spillover_matrix, tensor_W = SpatialTools.spatial_tensor(df_pol, df_angle, df_speed,
                                                                  weight_matrix, angle_matrix,
                                                                  tensor_type=tensor_typ)
-        np.save("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "tensor_W.npy", tensor_W)
+        # np.save("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "tensor_W.npy", tensor_W)
     else:
         spillover_matrix = SpatialTools.spatial_tensor(df_pol, df_angle, df_speed, weight_matrix,
                                                        angle_matrix, tensor_type=tensor_typ)
 
-    spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
-                            + "spillover_effects" + tensor_typ + ".csv")
+    # spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
+    #                         + "spillover_effects" + tensor_typ + ".csv")
     return spillover_matrix
 
 

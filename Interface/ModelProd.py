@@ -1,3 +1,8 @@
+from typing import Dict, Any
+
+from statsmodels.tsa.ar_model import AutoRegResults
+from statsmodels.tsa.vector_ar.var_model import VAR, VARResults
+
 from Interface.Backbone import Part1, Part2, Part3, Part4
 from statsmodels.tsa.api import VAR, AutoReg
 import pandas as pd
@@ -7,9 +12,8 @@ import numpy as np
 np.random.seed(123)
 
 
-def random_walk(sigma: str, geo_lev: str, time_lev: str) -> np.array:
+def random_walk(sigma: float, geo_lev: str, time_lev: str) -> np.array:
     """
-    :param df:
     :param sigma:
     :param geo_lev:
     :param time_lev:
@@ -36,7 +40,7 @@ def random_walk(sigma: str, geo_lev: str, time_lev: str) -> np.array:
     return data
 
 
-def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
+def AR_model(lags: int, geo_lev: str, time_lev: str) -> dict[Any, AutoRegResults]:
     """
     :param lags:
     :param geo_lev:
@@ -52,7 +56,7 @@ def AR_model(lags: int, geo_lev: str, time_lev: str) -> list:
     return output_models
 
 
-def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
+def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VARResults:
     """
     :param filepath:
     :param geo_lev:
@@ -70,7 +74,7 @@ def SWVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
     return SVAR_Model
 
 
-def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
+def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VARResults:
     """
     :param filepath:
     :param geo_lev:
@@ -88,7 +92,7 @@ def SVAR(filepath: str, geo_lev: str, time_lev: str) -> VAR:
     return SVAR_Model
 
 
-def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
+def standard_VAR(geo_lev: str, time_lev: str) -> VARResults:
     """
     :param geo_lev:
     :param time_lev:
@@ -100,13 +104,14 @@ def standard_VAR(geo_lev: str, time_lev: str) -> VAR:
     return model
 
 
-def create_set(geo_lev: str, time_lev: str) -> list:
+def create_set(geo_lev: str, time_lev: str) -> dict[str, VAR | list | Any]:
     """
     :param geo_lev:
     :param time_lev:
     :return:
     """
-    path = "/Users/main/Vault/Thesis/Data/Core/train_data.csv"
+    # path = "/Users/main/Vault/Thesis/Data/Core/train_data.csv"
+    path = r"C:\Users\VY72PC\PycharmProjects\Academia\Data\pm25_weer.csv"
 
     return {"SWVAR(1) Model": SWVAR(path, geo_lev=geo_lev, time_lev=time_lev),
             "SVAR(1) Model": SVAR(path, geo_lev=geo_lev, time_lev=time_lev),

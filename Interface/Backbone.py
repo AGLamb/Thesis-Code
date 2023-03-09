@@ -1,15 +1,16 @@
 from SpiPy import DataPrep, Separator, SpatialTools, SpatialRegression, ModelConfidenceSet
 from statsmodels.tsa.api import VAR
+from statsmodels.tsa.vector_ar.var_model import VARResults
 import pandas as pd
 import numpy as np
 
 
 def Part1(filepath: str, geo_lev: str, time_lev: str) -> pd.DataFrame:
     """
-    :param filepath:
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param filepath: file path to the raw training set
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: dataframe with the clean data
     """
     data = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(filepath)), geo_lev, time_lev)
     data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv")
@@ -18,9 +19,9 @@ def Part1(filepath: str, geo_lev: str, time_lev: str) -> pd.DataFrame:
 
 def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
     """
-    :param geo_lev:
-    :param time_lev:
-    :return:
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :return: individual dataframes for each variable
     """
     filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
     data = Separator.get_clean_data(filepath)
@@ -39,14 +40,14 @@ def Part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFr
 def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
           df_angle: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> pd.DataFrame:
     """
-    :param df_gen:
-    :param df_pol:
-    :param df_speed:
-    :param df_angle:
-    :param geo_lev:
-    :param time_lev:
-    :param tensor_typ:
-    :return:
+    :param df_gen: cleaned dataset
+    :param df_pol: dataset of pollution levels
+    :param df_speed: dataset of wind speeds
+    :param df_angle: dataset of wind directions
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :param tensor_typ: conditional to include wind variables in the calculations
+    :return: dataframe with spatial spillover effects
     """
     # filepath_cleaned = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
     # filepath_pol = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv"
@@ -74,20 +75,21 @@ def Part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
     return spillover_matrix
 
 
-def Part4(pollution: pd.DataFrame, WWY: pd.DataFrame, geo_lev: str, time_lev: str, tensor_typ: str) -> VAR:
+def Part4(pollution: pd.DataFrame, spillovers: pd.DataFrame,
+          geo_lev: str, time_lev: str, tensor_typ: str) -> VARResults:
     """
-    :param pollution:
-    :param WWY:
-    :param geo_lev:
-    :param time_lev:
-    :param tensor_typ:
-    :return:
+    :param pollution: dataset with pollution levels
+    :param spillovers: dataset with spatial spillover effects
+    :param geo_lev: granularity of the geographical division
+    :param time_lev: granularity of the time interval
+    :param tensor_typ: conditional to include the wind variables in the calculations
+    :return: VAR model
     """
     # filepath_pol = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv"
     # filepath_spill = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev +
     #                   "/" + "spillover_effects" + tensor_typ + ".csv"
     # df_pol, WWY = SpatialRegression.spatial_data(filepath_pol, filepath_spill)
 
-    spatial_model = SpatialRegression.spatial_VAR(pollution, WWY)
+    spatial_model = SpatialRegression.spatial_VAR(pollution, spillovers)
     print(spatial_model.test_normality(signif=0.05).summary())
     return spatial_model

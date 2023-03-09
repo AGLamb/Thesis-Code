@@ -1,12 +1,10 @@
 import pandas as pd
-import numpy as np
-import math
 
 
 def angle_correction(angle) -> int:
     """
-    :param angle:
-    :return:
+    :param angle: Faulty angle to be corrected
+    :return: angle in the desired range
     """
     if angle > 360:
         angle -= 360
@@ -39,8 +37,9 @@ def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
             axis=1, inplace=True)
 
     for row in df.itertuples():
-        index, DD_value = row.Index, row.DD
-        df.at[index, 'DD'] = angle_correction(row.DD)
+        index = row.index
+        DD_value: int = row['DD']
+        df.at[index, 'DD'] = angle_correction(DD_value)
 
     df.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
 
@@ -50,10 +49,10 @@ def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
 def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
 
     """
-    :param df:
-    :param geo_level:
-    :param time_interval:
-    :return:
+    :param df: cleaned dataset
+    :param geo_level: granularity of the geographical division
+    :param time_interval: granularity of the time interval
+    :return: a grouped dataframe at the desired geographical level and time interval
     """
 
     if geo_level == "street":

@@ -4,8 +4,8 @@ import numpy as np
 
 def get_clean_data(path: str) -> pd.DataFrame:
     """
-    :param path:
-    :return:
+    :param path: filepath to the raw data
+    :return: Pandas DataFrame with the raw data
     """
     return pd.read_csv(path, index_col=0)
 
@@ -13,10 +13,10 @@ def get_clean_data(path: str) -> pd.DataFrame:
 def matrix_creator(input_df: pd.DataFrame, geo_level: str,
                    faulty: list) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
     """
-    :param input_df:
-    :param geo_level:
-    :param faulty:
-    :return:
+    :param input_df: dataset with the raw data
+    :param geo_level: granularity for the geographical division
+    :param faulty: sensors that have to be eliminated
+    :return: three dataframes, each containing one the individual data for a variable
     """
 
     if geo_level == "street":
@@ -55,9 +55,9 @@ def matrix_creator(input_df: pd.DataFrame, geo_level: str,
 
 def delete_sensors(df_input: pd.DataFrame, pop_sensors: list) -> pd.DataFrame:
     """
-    :param df_input:
-    :param pop_sensors:
-    :return:
+    :param df_input: dataset to analyse
+    :param pop_sensors: list of sensors that has to be deleted
+    :return: dataset without the removed sensors
     """
     if len(pop_sensors) > 0:
         df = df_input.copy()

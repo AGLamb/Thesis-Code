@@ -62,7 +62,6 @@ def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
         time_group = "YYYYMMDD"
     else:
         time_group = "timestamp"
-
     grouped_df = df.groupby(by=[geo_group, time_group]).median().copy().reset_index()
     grouped_df["Date"] = pd.to_datetime(grouped_df[time_group].astype(str))
 

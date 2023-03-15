@@ -1,6 +1,8 @@
+from __future__ import annotations
 from typing import Tuple, Any
 from pandas import DataFrame
 from statsmodels.tsa.api import AutoReg, VAR
+from statsmodels.api import GLSAR
 import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 import pandas as pd
@@ -8,16 +10,14 @@ import numpy as np
 from statsmodels.tsa.vector_ar.var_model import VARResults
 
 
-def spatial_VAR(pollution, spillover_matrix) -> VARResults:
+def spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
     """
-    :param pollution: dataset with the pollution levels
     :param spillover_matrix: dataset with the pollution spillovers from adjacent locations
     :return: VAR model
     """
-    lagged_spillover = spillover_matrix.shift(1)
-    lagged_spillover.at[0, :] = 0
-    spatial_VAR = VAR(pollution, exog=lagged_spillover).fit(maxlags=1, trend='c')
-    return spatial_VAR
+    spatial_var = VAR(endog=spillover_matrix).fit(maxlags=1, trend='c')
+    # print(spatial_var.summary())
+    return spatial_var
 
 
 def get_R2(model, location_dict) -> None:

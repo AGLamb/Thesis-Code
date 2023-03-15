@@ -1,9 +1,8 @@
+from __future__ import annotations
 from typing import Tuple, Any
-
 from geopy.distance import great_circle
 from numpy import ndarray
 from pandas import DataFrame
-from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import math
@@ -24,7 +23,7 @@ def get_bearing(coor1, coor2) -> float:
 
 
 def get_data(path_df, path_pol, path_angle, path_wind) -> tuple[
-    DataFrame | Any, DataFrame | Any, DataFrame | Any, DataFrame | Any]:
+             DataFrame | Any, DataFrame | Any, DataFrame | Any, DataFrame | Any]:
     """
     :param path_df: filepath to the clean data
     :param path_pol: filepath to the pollution data
@@ -80,7 +79,8 @@ def weight_angle_matrix(loc_dict) -> tuple[ndarray, ndarray]:
                 W[i, j] = 1 / great_circle(loc_dict[locations[i]], loc_dict[locations[j]]).km
                 AngleMatrix[i, j] = theta
             else:
-                W[i, j] = 0
+                W[i, i] = 0
+                AngleMatrix[i, i] = 0
 
     return W, AngleMatrix
 
@@ -102,11 +102,13 @@ def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
         WW = np.zeros((len(angle), len(angle.columns), len(angle.columns)))
         WWY = np.zeros((len(angle), len(pol.columns)))
 
-        for i in tqdm(range(len(angle))):
+        for i in range(len(angle)):
             time_angle = angle.iloc[i, :].to_numpy().reshape(len(angle.columns), 1)
             time_speed = wind.iloc[i, :].to_numpy().reshape(len(angle.columns), 1)
             WW[i, :, :] = np.cos(AngleMatrix - time_angle[np.newaxis, :]) * time_speed[np.newaxis, :] * W_matrix
-            WWY[i, :] = np.matmul(WW[i, :, :], pol.iloc[i, :].to_numpy())
+            for j in range(len(angle.columns)):
+                WW[i, j, j] = 1
+            # WWY[i, :] = np.maximum((WW[i, :, :] @ pol.iloc[i, :].to_numpy()), 0)
         WWY = pd.DataFrame(WWY)
 
         for i in range(len(pol.columns)):
@@ -119,7 +121,10 @@ def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
     else:
         WWY = np.zeros((len(angle), len(pol.columns)))
 
-        for i in tqdm(range(len(angle))):
+        for i in range(W_matrix.shape[0]):
+            W_matrix[i, i] = 1
+
+        for i in range(len(angle)):
             WWY[i, :] = W_matrix @ pol.iloc[i, :].to_numpy()
         WWY = pd.DataFrame(WWY)
 
@@ -129,6 +134,3 @@ def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
         WWY.set_index(pol.index, inplace=True)
 
         return WWY
-
-
-

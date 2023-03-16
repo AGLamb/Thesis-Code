@@ -1,3 +1,5 @@
+import pandas as pd
+
 from SpiPy.ModelProd import create_set
 from SpiPy.ModelConfidenceSet import *
 from SpiPy.Forecast import *
@@ -31,7 +33,13 @@ def main():
     # performance_data_sd = get_performance(input_set=train_set_s_d, geo_lev=street_level, time_lev=day_interval)
     # print(f'Fourth performance set is ready')
 
-    confidenceSet = ModelConfidenceSet(performance_data_md, 0.1,3, 1000).run()
+    performance_set = pd.concat([performance_data_mh, performance_data_md], axis=1)
+                                 # performance_data_sh, performance_data_sd], axis=1)
+
+    alphas = [0.5, 0.2, 0.1, 0.05]
+    for i in range(len(alphas)):
+        confidence_set = ModelConfidenceSet(data=performance_set, alpha=alphas[i], B=5, w=10000).run()
+        print(confidence_set.included)
 
     end_time = time.time()
     print("Time taken: ", end_time - start_time, "seconds")

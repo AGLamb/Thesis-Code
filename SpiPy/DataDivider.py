@@ -17,8 +17,8 @@ def main():
     train_data = df.iloc[:cutout, :].copy()
     test_data = df.iloc[cutout:, :].copy()
 
-    train_data.to_csv("./Data/Core/train_data.csv")
-    test_data.to_csv("./Data/Core/test_data.csv")
+    train_data.to_csv("./Data/train_data.csv")
+    test_data.to_csv("./Data/test_data.csv")
     return
 
 

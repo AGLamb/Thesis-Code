@@ -32,8 +32,8 @@ def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
     df = df_input.copy()
     df["FH"] = df["FH"] * 0.36
     df.drop(['id', 'no2', 'pm10', 'pm10_cal', 'pm10_fac', 'pm10_max', 'pm10_min', 'pm25_cal',
-            'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
-            'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
+             'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
+             'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
             axis=1, inplace=True)
 
     for i in range(len(df)):

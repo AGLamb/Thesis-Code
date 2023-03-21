@@ -24,7 +24,7 @@ def get_data(filepath: str) -> pd.DataFrame:
     return pd.read_csv(filepath)
 
 
-def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
+def format_data(df_input: pd.DataFrame, faulty: list) -> pd.DataFrame:
     """
     :param df_input: Raw data from Hollandse Luchten formatting
     :return: Source data set with variables of interest
@@ -41,7 +41,7 @@ def format_data(df_input: pd.DataFrame) -> pd.DataFrame:
 
     df.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
 
-    return df
+    return delete_sensors(df, faulty)
 
 
 def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
@@ -73,3 +73,17 @@ def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
     grouped_df.set_index("Date", inplace=True)
 
     return grouped_df
+
+
+def delete_sensors(df_input: pd.DataFrame, pop_sensors: list) -> pd.DataFrame:
+    """
+    :param df_input: dataset to analyse
+    :param pop_sensors: list of sensors that has to be deleted
+    :return: dataset without the removed sensors
+    """
+    if len(pop_sensors) > 0:
+        df = df_input.copy()
+        df = df[~df['tag'].isin(pop_sensors)]
+        return df
+    else:
+        return df_input

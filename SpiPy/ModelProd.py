@@ -10,8 +10,9 @@ import numpy as np
 np.random.seed(123)
 
 
-def random_walk(sigma: float, df: int, pollution_data: pd.DataFrame) -> np.array:
+def random_walk(sigma: float, df: int, pollution_data: pd.DataFrame, geo_level: int = "municipality") -> np.array:
     """
+    :param geo_level:
     :param sigma:
     :param df:
     :param pollution_data:
@@ -21,12 +22,21 @@ def random_walk(sigma: float, df: int, pollution_data: pd.DataFrame) -> np.array
     t = len(pollution_data)
     k = len(pollution_data.columns)
 
-    eps = np.random.standard_t(df, size=(t, k)) * sigma
-    data = np.zeros((t, k))
-    data[0, :] = np.random.normal(0, sigma, size=k)
+    if geo_level == "street":
+        eps = np.random.standard_t(df, size=(t, k+1)) * sigma
+        data = np.zeros((t, k+1))
+        data[0, :] = eps[0, :]
 
-    for i in range(1, t):
-        data[i, :] = data[i - 1, :] + eps[i, :]
+        for i in range(1, t):
+            data[i, :] = data[i - 1, :] + eps[i, :]
+
+    else:
+        eps = np.random.standard_t(df, size=(t, k)) * sigma
+        data = np.zeros((t, k))
+        data[0, :] = eps[0, :]
+
+        for i in range(1, t):
+            data[i, :] = data[i - 1, :] + eps[i, :]
 
     return data
 
@@ -51,8 +61,7 @@ def create_set(geo_lev: str, time_lev: str) -> dict[str, VAR | list | Any]:
     :param time_lev:
     :return:
     """
-    # path = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-    path = r"C:\Users\VY72PC\PycharmProjects\Academia\Data\train_data.csv"
+    path = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
 
     clean_df = part1(filepath=path, geo_lev=geo_lev, time_lev=time_lev)
     pollution, w_speed, w_angle = part2(geo_lev=geo_lev, time_lev=time_lev)
@@ -63,4 +72,4 @@ def create_set(geo_lev: str, time_lev: str) -> dict[str, VAR | list | Any]:
             "SVAR(1) Model": part4(space_spillover),
             "VAR(1) Model": VAR(pollution).fit(maxlags=1, trend='c'),
             "AR(1) Models": ar_model(lags=1, pollution_data=pollution),
-            "Random Walk": random_walk(sigma=4, df=5, pollution_data=pollution)}
+            "Random Walk": random_walk(sigma=4, df=5, pollution_data=pollution, geo_level=geo_lev)}

@@ -5,6 +5,7 @@ from statsmodels.tsa.api import VAR
 import sklearn.metrics as skm
 import pandas as pd
 from statsmodels.tsa.vector_ar.var_model import VARResults
+from statsmodels.stats.correlation_tools import cov_nearest
 
 
 def spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
@@ -13,6 +14,22 @@ def spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
     :return: VAR model
     """
     spatial_var = VAR(endog=spillover_matrix).fit(maxlags=1, trend='c')
+    print(spatial_var.summary())
+    # psd_cov = cov_nearest(spatial_var.cov, method='clipped', threshold=1e-15, n_fact=100, return_all=False)
+    # spatial_var.irf(periods=10)
+    return spatial_var
+
+
+def restricted_spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
+    """
+    :param spillover_matrix: dataset with the pollution spillovers from adjacent locations
+    :return: VAR model
+    """
+
+    n = len(spillover_matrix.columns)
+    A = np.zeros((n, n))
+    A[np.diag_indices(n)] = 1
+    spatial_var = VAR(endog=spillover_matrix).fit_(maxlags=1, trend='c')
     # print(spatial_var.summary())
     return spatial_var
 

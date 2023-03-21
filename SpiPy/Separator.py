@@ -9,12 +9,10 @@ def get_clean_data(path: str) -> pd.DataFrame:
     return pd.read_csv(path, index_col=0)
 
 
-def matrix_creator(input_df: pd.DataFrame, geo_level: str,
-                   faulty: list) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
+def matrix_creator(input_df: pd.DataFrame, geo_level: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
     """
     :param input_df: dataset with the raw data
     :param geo_level: granularity for the geographical division
-    :param faulty: sensors that have to be eliminated
     :return: three dataframes, each containing one the individual data for a variable
     """
 
@@ -49,18 +47,5 @@ def matrix_creator(input_df: pd.DataFrame, geo_level: str,
         df_angle[column].fillna(value=median_values[1], inplace=True)
         df_wind[column].fillna(value=median_values[2], inplace=True)
 
-    return delete_sensors(df_pol, faulty), delete_sensors(df_wind, faulty), delete_sensors(df_angle, faulty)
+    return df_pol, df_wind, df_angle
 
-
-def delete_sensors(df_input: pd.DataFrame, pop_sensors: list) -> pd.DataFrame:
-    """
-    :param df_input: dataset to analyse
-    :param pop_sensors: list of sensors that has to be deleted
-    :return: dataset without the removed sensors
-    """
-    if len(pop_sensors) > 0:
-        df = df_input.copy()
-        df.drop(columns=pop_sensors, inplace=True)
-        return df
-    else:
-        return df_input

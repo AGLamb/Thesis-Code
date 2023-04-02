@@ -8,7 +8,7 @@ import numpy as np
 import math
 
 
-def get_bearing(coor1, coor2) -> float:
+def get_bearing(coor1: float, coor2: float) -> float:
     """
     :param coor1: Pairs of longitude and latitude of the first location
     :param coor2: Latitute
@@ -22,7 +22,7 @@ def get_bearing(coor1, coor2) -> float:
     return brng
 
 
-def get_data(path_df, path_pol, path_angle, path_wind) -> tuple[
+def get_data(path_df:pd.DataFrame, path_pol:pd.DataFrame, path_angle: str, path_wind: str) -> tuple[
              DataFrame | Any, DataFrame | Any, DataFrame | Any, DataFrame | Any]:
     """
     :param path_df: filepath to the clean data
@@ -38,7 +38,7 @@ def get_data(path_df, path_pol, path_angle, path_wind) -> tuple[
     return df, pol, angle, wind
 
 
-def coordinate_dict(df, geo_level, pol):
+def coordinate_dict(df: pd.DataFrame, geo_level: str, pol: pd.DataFrame):
     """
     :param df: input dataset
     :param geo_level: variable that defines the granularity of the geographical divisions
@@ -60,7 +60,7 @@ def coordinate_dict(df, geo_level, pol):
     return c_dict
 
 
-def weight_angle_matrix(loc_dict) -> tuple[ndarray, ndarray]:
+def weight_angle_matrix(loc_dict: dict) -> tuple[ndarray, ndarray]:
     """
     :param loc_dict: Dictionary with location names and corresponding coordinates
     :return: Two matrices, one that contains the inverse of the distance between two points,
@@ -103,26 +103,26 @@ def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
         wwy = np.zeros((len(angle), len(pol.columns)))
 
         for i in range(len(angle)):
-            time_angle = angle.iloc[i, :].to_numpy().reshape(len(angle.columns), 1)
-            time_speed = wind.iloc[i, :].to_numpy().reshape(len(angle.columns), 1)
+            time_angle = angle.iloc[i, :].to_numpy()
+            time_speed = wind.iloc[i, :].to_numpy()
             ww_tensor[i, :, :] = np.cos(angle_matrix - time_angle[np.newaxis, :]) * time_speed[np.newaxis, :] * w_matrix
+
             for j in range(len(angle.columns)):
                 ww_tensor[i, j, j] = 1
-            # WWY[i, :] = np.maximum((WW[i, :, :] @ pol.iloc[i, :].to_numpy()), 0)
-        wwy = pd.DataFrame(wwy)
 
+            wwy[i, :] = ww_tensor[i, :, :] @ pol.iloc[i, :].T
+
+        wwy = pd.DataFrame(wwy)
         for i in range(len(pol.columns)):
             wwy.rename(columns={i: 'Spatial ' + pol.columns[i]}, inplace=True)
 
         wwy.set_index(pol.index, inplace=True)
-
         return wwy, ww_tensor
 
     else:
         wwy = np.zeros((len(angle), len(pol.columns)))
-
         for i in range(w_matrix.shape[0]):
-            w_matrix[i, i] = 1
+            w_matrix[i, i] = 0
 
         for i in range(len(angle)):
             wwy[i, :] = w_matrix @ pol.iloc[i, :].to_numpy()
@@ -132,5 +132,4 @@ def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
             wwy.rename(columns={i: 'Spatial ' + pol.columns[i]}, inplace=True)
 
         wwy.set_index(pol.index, inplace=True)
-
         return wwy

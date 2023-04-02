@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any
 from pandas import DataFrame
+from statsmodels.api import GLS
 from statsmodels.tsa.api import VAR
 import sklearn.metrics as skm
 import pandas as pd
@@ -29,8 +30,8 @@ def restricted_spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
     n = len(spillover_matrix.columns)
     A = np.zeros((n, n))
     A[np.diag_indices(n)] = 1
-    spatial_var = VAR(endog=spillover_matrix).fit_(maxlags=1, trend='c')
-    # print(spatial_var.summary())
+    spatial_var = GLS(endog=spillover_matrix.iloc[1:, :], exog=spillover_matrix.shift(1).iloc[1:, :]).fit_constrained(A)
+    print(spatial_var.summary())
     return spatial_var
 
 

@@ -67,6 +67,7 @@ def create_set(geo_lev: str, time_lev: str) -> dict[str, VAR | list | Any]:
     pollution, w_speed, w_angle = part2(geo_lev=geo_lev, time_lev=time_lev)
     wind_spillover, space_spillover, w_matrix, ww_tensor = part3(clean_df, pollution, w_speed, w_angle,
                                                                  geo_lev=geo_lev, time_lev=time_lev)
+    print(wind_spillover)
 
     return {"SWVAR(1) Model": part4(wind_spillover),
             "SVAR(1) Model": part4(space_spillover),

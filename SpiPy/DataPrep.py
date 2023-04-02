@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def angle_correction(angle) -> int:
+def angle_correction(angle: int) -> int:
     """
     :param angle: Faulty angle to be corrected
     :return: angle in the desired range
@@ -26,6 +26,7 @@ def get_data(filepath: str) -> pd.DataFrame:
 
 def format_data(df_input: pd.DataFrame, faulty: list) -> pd.DataFrame:
     """
+    :param faulty:
     :param df_input: Raw data from Hollandse Luchten formatting
     :return: Source data set with variables of interest
     """
@@ -40,19 +41,16 @@ def format_data(df_input: pd.DataFrame, faulty: list) -> pd.DataFrame:
         df.at[i, 'DD'] = angle_correction(df.at[i, 'DD'])
 
     df.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
-
     return delete_sensors(df, faulty)
 
 
-def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
-
+def group_data(df: pd.DataFrame, geo_level: str, time_interval: str) -> pd.DataFrame:
     """
     :param df: cleaned dataset
     :param geo_level: granularity of the geographical division
     :param time_interval: granularity of the time interval
     :return: a grouped dataframe at the desired geographical level and time interval
     """
-
     if geo_level == "street":
         geo_group = "name"
     else:
@@ -62,6 +60,7 @@ def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
         time_group = "YYYYMMDD"
     else:
         time_group = "timestamp"
+
     grouped_df = df.groupby(by=[geo_group, time_group]).median().copy().reset_index()
     grouped_df["Date"] = pd.to_datetime(grouped_df[time_group].astype(str))
 
@@ -71,7 +70,6 @@ def group_data(df, geo_level: str, time_interval: str) -> pd.DataFrame:
         grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
 
     grouped_df.set_index("Date", inplace=True)
-
     return grouped_df
 
 

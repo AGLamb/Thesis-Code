@@ -7,6 +7,7 @@ from rpy2.robjects import numpy2ri, pandas2ri
 from statsmodels.api import GLS, add_constant
 from rpy2.robjects.packages import importr
 from statsmodels.tsa.api import VAR
+import matplotlib.pyplot as plt
 import sklearn.metrics as skm
 from pandas import DataFrame
 from rpy2.robjects import r
@@ -28,6 +29,9 @@ def spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
     """
     spatial_var = VAR(endog=spillover_matrix).fit(maxlags=1, trend='c')
     # print(spatial_var.summary())
+    irf = spatial_var.irf(periods=5)
+    irf.plot(orth=False)
+    plt.show()
     return spatial_var
 
 

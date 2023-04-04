@@ -114,7 +114,7 @@ def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
 
         wwy = pd.DataFrame(wwy)
         for i in range(len(pol.columns)):
-            wwy.rename(columns={i: 'Spatial ' + pol.columns[i]}, inplace=True)
+            wwy.rename(columns={i: pol.columns[i]}, inplace=True)
 
         wwy.set_index(pol.index, inplace=True)
         return wwy, ww_tensor
@@ -129,7 +129,7 @@ def spatial_tensor(pol: pd.DataFrame, angle: pd.DataFrame, wind: pd.DataFrame,
         wwy = pd.DataFrame(wwy)
 
         for i in range(len(pol.columns)):
-            wwy.rename(columns={i: 'Spatial ' + pol.columns[i]}, inplace=True)
+            wwy.rename(columns={i: pol.columns[i]}, inplace=True)
 
         wwy.set_index(pol.index, inplace=True)
         return wwy

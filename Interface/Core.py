@@ -39,12 +39,12 @@ def main():
     hour_interval = "hours"
     day_interval = "day"
 
-    perfomance_funcitons = [MAE, MSE, RMSE, MAPE]
+    perfomance_funcitons = [MAPE]  # , MSE, RMSE, MAPE]
     for function in perfomance_funcitons:
         Thesis_Process(score_function=function, aggreg=mun_level, intervals=hour_interval).run()
-        Thesis_Process(score_function=function, aggreg=mun_level, intervals=day_interval).run()
-        Thesis_Process(score_function=function, aggreg=street_level, intervals=hour_interval).run()
-        Thesis_Process(score_function=function, aggreg=street_level, intervals=day_interval).run()
+        # Thesis_Process(score_function=function, aggreg=mun_level, intervals=day_interval).run()
+        # Thesis_Process(score_function=function, aggreg=street_level, intervals=hour_interval).run()
+        # Thesis_Process(score_function=function, aggreg=street_level, intervals=day_interval).run()
 
     end_time = time.time()
     print("Time taken: ", end_time - start_time, "seconds")

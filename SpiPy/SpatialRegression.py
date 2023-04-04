@@ -1,12 +1,24 @@
 from __future__ import annotations
-from typing import Any
-from pandas import DataFrame
-from statsmodels.api import GLS
+
+from statsmodels.stats.correlation_tools import cov_nearest
+from statsmodels.tsa.vector_ar.var_model import VARResults
+from rpy2.robjects.conversion import localconverter
+from rpy2.robjects import numpy2ri, pandas2ri
+from statsmodels.api import GLS, add_constant
+from rpy2.robjects.packages import importr
 from statsmodels.tsa.api import VAR
 import sklearn.metrics as skm
+from pandas import DataFrame
+from rpy2.robjects import r
+import rpy2.robjects as ro
+from typing import Any
 import pandas as pd
-from statsmodels.tsa.vector_ar.var_model import VARResults
-from statsmodels.stats.correlation_tools import cov_nearest
+import numpy as np
+
+
+class SpatialVAR:
+    def __init__(self, lags: str):
+        self.order = lags
 
 
 def spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
@@ -15,9 +27,7 @@ def spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
     :return: VAR model
     """
     spatial_var = VAR(endog=spillover_matrix).fit(maxlags=1, trend='c')
-    print(spatial_var.summary())
-    # psd_cov = cov_nearest(spatial_var.cov, method='clipped', threshold=1e-15, n_fact=100, return_all=False)
-    # spatial_var.irf(periods=10)
+    # print(spatial_var.summary())
     return spatial_var
 
 
@@ -26,13 +36,31 @@ def restricted_spatial_VAR(spillover_matrix: pd.DataFrame) -> VARResults:
     :param spillover_matrix: dataset with the pollution spillovers from adjacent locations
     :return: VAR model
     """
-
+    print(spillover_matrix)
+    pandas2ri.activate()
+    r_df = pandas2ri.py2rpy(spillover_matrix)
     n = len(spillover_matrix.columns)
-    A = np.zeros((n, n))
-    A[np.diag_indices(n)] = 1
-    spatial_var = GLS(endog=spillover_matrix.iloc[1:, :], exog=spillover_matrix.shift(1).iloc[1:, :]).fit_constrained(A)
-    print(spatial_var.summary())
-    return spatial_var
+    # Define R script
+    r_script = """
+    # Load required library
+    library("vars")
+    # Run a normal VAR model
+    t = VAR(data, p = 1, type = "const")
+    restrict_m <- matrix(1, nrow = n, ncol = n + 1)
+    model <- restrict(t, method = "man", resmat = restrict_m)
+    estimates = as.data.frame(model$varresult$Phi)
+    """
+    r_env = ro.globalenv
+    r_env['data'] = r_df
+    r_env['n'] = n
+    ro.r(r_script)
+    model = r_env['estimates']
+    model_df = pandas2ri.DataFrame(model)
+    # with localconverter(ro.default_converter + pandas2ri.converter):
+    #     model_dict = ro.conversion.rpy2py(model)
+    # model_df = pd.DataFrame(model_dict)
+    print(model_df)
+    return model
 
 
 def get_R2(model, location_dict) -> None:

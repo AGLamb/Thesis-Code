@@ -1,23 +1,54 @@
-from SpiPy import DataPrep, Separator, SpatialTools, SpatialRegression
+from SpiPy import DataPrep, SpatialTools, SpatialRegression
 from statsmodels.tsa.vector_ar.var_model import VARResults
 import pandas as pd
 import numpy as np
 
 
-def part1(filepath: str, geo_lev: str, time_lev: str) -> pd.DataFrame:
+def part1(geo_lev: str, time_lev: str, type_key: str) -> pd.DataFrame:
     """
-    :param filepath: file path to the raw training set
+    :param type_key:
     :param geo_lev: granularity of the geographical division
     :param time_lev: granularity of the time interval
     :return: dataframe with the clean data
     """
+    if type_key == 'train':
+        path = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
+        path2 = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
+    else:
+        path2 = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
+        path = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
+
+    if geo_lev == "street":
+        geo_group = "name"
+    else:
+        geo_group = "tag"
 
     no_sensors = ["Uithoorn", "Velsen-Zuid", "Koog aan de Zaan", "Wijk aan Zee"]
 
-    data = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(filepath),
-                                                    faulty=no_sensors), geo_lev, time_lev)
+    data_df = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path),
+                                                       faulty=no_sensors), geo_lev, time_lev)
+
+    data_df2 = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path2),
+                                                        faulty=no_sensors), geo_lev, time_lev)
+    misplaced = set(data_df[geo_group].unique()) - set(data_df2[geo_group].unique())
+    data = delete_places(df_input=data_df, pop_places=misplaced, key=geo_group)
     data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv")
     return data
+
+
+def delete_places(df_input: pd.DataFrame, pop_places: list, key: str) -> pd.DataFrame:
+    """
+    :param key:
+    :param pop_places:
+    :param df_input: dataset to analyse
+    :return: dataset without the removed sensors
+    """
+    if len(pop_places) > 0:
+        df = df_input.copy()
+        df = df[~df[key].isin(pop_places)]
+        return df
+    else:
+        return df_input
 
 
 def part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
@@ -27,9 +58,9 @@ def part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFr
     :return: individual dataframes for each variable
     """
     filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
-    data = Separator.get_clean_data(filepath)
+    data = DataPrep.get_clean_data(filepath)
 
-    pollution, w_speed, w_angle = Separator.matrix_creator(data, geo_lev)
+    pollution, w_speed, w_angle = DataPrep.matrix_creator(data, geo_lev)
     pollution.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv")
     w_speed.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_speed.csv")
     w_angle.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_angle.csv")
@@ -65,11 +96,14 @@ def part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
     return wind_spillover_matrix, space_spillover_matrix, weight_matrix, tensor_w
 
 
-def part4(spillovers: pd.DataFrame) -> VARResults:
+def part4(spillovers: pd.DataFrame, restricted: bool = False) -> VARResults:
     """
+    :param restricted:
     :param spillovers: dataset with spatial spillover effects
     :return: VAR model
     """
-
-    spatial_model = SpatialRegression.spatial_VAR(spillovers)
+    if restricted:
+        spatial_model = SpatialRegression.restricted_spatial_VAR(spillovers)
+    else:
+        spatial_model = SpatialRegression.spatial_VAR(spillovers)
     return spatial_model

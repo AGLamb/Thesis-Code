@@ -7,8 +7,16 @@ import pandas as pd
 import numpy as np
 
 
-def get_performance(input_set: Any, geo_lev: str, time_lev: str,
+def get_performance(input_set: Any, geo_lev: str, time_lev: str, restricted: bool,
                     func: Callable[[np.ndarray, np.ndarray], float]) -> DataFrame:
+    """
+
+    :param input_set:
+    :param geo_lev:
+    :param restricted:
+    :param time_lev:
+    :type func: object
+    """
     path = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
 
     if time_lev == "day":
@@ -16,22 +24,32 @@ def get_performance(input_set: Any, geo_lev: str, time_lev: str,
     else:
         forecast_steps = 365 * 24
 
-    pollution, weight_matrix, w_tensor = get_test_data(path, geo_lev=geo_lev, time_lev=time_lev)
-    columns_to_drop = set(pollution.columns) - set(input_set["AR(1) Models"].keys())
-    clean_pollution = pollution.drop(columns=columns_to_drop)
+    clean_pollution, weight_matrix, w_tensor = get_test_data(geo_lev=geo_lev, time_lev=time_lev)
 
-    rw_errors = random_walk_forecast(rw_data=input_set["Random Walk"], sigma=4, df=5,
-                                     forecast=forecast_steps, pollution=clean_pollution, score=func)
+    rw_errors = random_walk_forecast(rw_data=input_set["Random Walk"], sigma=1, df=5,
+                                     forecast=forecast_steps, pollution=clean_pollution, func=func)
     ar_errors = ar_forecast(ar_set=input_set["AR(1) Models"], pollution=clean_pollution,
-                            forecast=forecast_steps, score=func)
+                            forecast=forecast_steps, func=func)
     var_errors = var_forecast(var_mod=input_set["VAR(1) Model"], pollution=clean_pollution,
-                              forecast=forecast_steps, score=func)
+                              forecast=forecast_steps, func=func)
     svar_errors = svar_forecast(var_mod=input_set["SVAR(1) Model"], pollution=clean_pollution,
-                                forecast=forecast_steps, w_matrix=weight_matrix, score=func)
+                                forecast=forecast_steps, w_matrix=weight_matrix, func=func)
     swvar_errors = swvar_forecast(var_mod=input_set["SWVAR(1) Model"], pollution=clean_pollution,
-                                  forecast=forecast_steps, ww_tensor=w_tensor, score=func)
+                                  forecast=forecast_steps, ww_tensor=w_tensor, func=func)
 
-    return pd.DataFrame({
+    if restricted:
+        res_swvar_errors = swvar_forecast(var_mod=input_set["Restricted SWVAR(1) Model"], pollution=clean_pollution,
+                                          forecast=forecast_steps, ww_tensor=w_tensor, func=func)
+
+        return pd.DataFrame({
+                "Random Walk": rw_errors,
+                "AR(1) Models": ar_errors,
+                "VAR(1) Model": var_errors,
+                "SVAR(1) Model": svar_errors,
+                "SWVAR(1) Model": swvar_errors,
+                "Restricted SWVAR(1) Model": res_swvar_errors})
+    else:
+        return pd.DataFrame({
             "Random Walk": rw_errors,
             "AR(1) Models": ar_errors,
             "VAR(1) Model": var_errors,
@@ -64,40 +82,52 @@ def AIC(residuals: np.ndarray, endog: np.ndarray) -> float:
 
 
 def random_walk_forecast(rw_data: np.ndarray, sigma: float, df: int, forecast: int,
-                         pollution: pd.DataFrame, score: Callable[[np.ndarray, np.ndarray], float]) -> np.ndarray:
+                         pollution: pd.DataFrame, func: Callable[[np.ndarray, np.ndarray], float]) -> np.ndarray:
     t = forecast
     k = len(pollution.columns)
 
+    output_matrix = np.zeros(t)
     data = np.zeros((t, k))
     eps = np.random.standard_t(df, size=(t, k)) * sigma
-    data[0, :] = rw_data[-1, :] + eps[0, :]
+    data[0, :] = rw_data[-1, :k] + eps[0, :]
 
     for i in range(1, t):
         data[i, :] = data[i - 1, :] + eps[i, :]
 
-    return score(pollution.iloc[:len(data), :].to_numpy(), data)
+    for i in range(t):
+        output_matrix[i] = func(pollution.iloc[i, :].to_numpy(), data[i, :])
+
+    return output_matrix
 
 
 def ar_forecast(ar_set: dict, pollution: pd.DataFrame, forecast: int,
-                score: Callable[[np.ndarray, np.ndarray], float]) -> np.ndarray:
+                func: Callable[[np.ndarray, np.ndarray], float]) -> np.ndarray:
     pred = np.zeros((forecast, len(pollution.columns)))
+    output_matrix = np.zeros(forecast)
 
     i = 0
     for column in pollution:
         pred[:, i] = ar_set[column].forecast(steps=forecast)
         i += 1
 
-    return score(pollution.iloc[:len(pred), :].to_numpy(), pred)
+    for i in range(forecast):
+        output_matrix[i] = func(pollution.iloc[i, :].to_numpy(), pred[i, :])
+
+    return output_matrix
 
 
 def var_forecast(var_mod: VARResults, pollution: pd.DataFrame, forecast: int,
-                 score: Callable[[np.ndarray, np.ndarray], float]):
+                 func: Callable[[np.ndarray, np.ndarray], float]):
     pred = var_mod.forecast(y=var_mod.endog, steps=forecast)
-    return score(pollution.iloc[:forecast, :].to_numpy(), pred)
+    output_matrix = np.zeros(forecast)
+
+    for i in range(forecast):
+        output_matrix[i] = func(pollution.iloc[i, :].to_numpy(), pred[i, :])
+    return output_matrix
 
 
 def svar_forecast(var_mod: VARResults, pollution: pd.DataFrame, w_matrix: np.ndarray,
-                  forecast: int, score: Callable[[np.ndarray, np.ndarray], float]) -> Any:
+                  forecast: int, func: Callable[[np.ndarray, np.ndarray], float]) -> Any:
     pred = np.zeros((forecast, len(pollution.columns)))
     output_matrix = np.zeros(forecast)
 
@@ -109,12 +139,13 @@ def svar_forecast(var_mod: VARResults, pollution: pd.DataFrame, w_matrix: np.nda
     for i in range(1, pred.shape[0]):
         argument = np.concatenate([c, (w_matrix @ pred[i - 1, :].T).reshape(len(pollution.columns), 1)])
         pred[i, :] = (var_mod.params.T @ argument).T
+        output_matrix[i] = func(pollution.iloc[i, :].to_numpy(), pred[i, :])
 
-    return score(pollution.iloc[:len(pred), :].to_numpy(), pred)
+    return output_matrix
 
 
 def swvar_forecast(var_mod: VARResults, pollution: pd.DataFrame, ww_tensor: np.ndarray,
-                   forecast: int, score: Callable[[np.ndarray, np.ndarray], float]) -> Any:
+                   forecast: int, func: Callable[[np.ndarray, np.ndarray], float]) -> Any:
     pred = np.zeros((forecast, len(pollution.columns)))
     output_matrix = np.zeros(forecast)
 
@@ -127,11 +158,11 @@ def swvar_forecast(var_mod: VARResults, pollution: pd.DataFrame, ww_tensor: np.n
         argument = np.concatenate([c, (ww_tensor[i, :, :] @ pred[i - 1, :].T).reshape(len(pollution.columns), 1)])
         pred[i, :] = (var_mod.params.T @ argument).T
 
-    return score(pollution.iloc[:len(pred), :].to_numpy(), pred)
+    return func(pollution.iloc[:len(pred), :].to_numpy(), pred)
 
 
-def get_test_data(filepath: str, geo_lev: str, time_lev: str) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
-    clean_df = part1(filepath, geo_lev=geo_lev, time_lev=time_lev)
+def get_test_data(geo_lev: str, time_lev: str) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    clean_df = part1(geo_lev=geo_lev, time_lev=time_lev, type_key='test')
     pollution, w_speed, w_angle = part2(geo_lev=geo_lev, time_lev=time_lev)
     wind_spillover, space_spillover, w_array, ww_tensor = part3(clean_df, pollution, w_speed, w_angle,
                                                                 geo_lev=geo_lev, time_lev=time_lev)

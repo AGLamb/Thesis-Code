@@ -55,22 +55,28 @@ def ar_model(lags: int, pollution_data: pd.DataFrame) -> dict[Any, AutoRegResult
     return output_models
 
 
-def create_set(geo_lev: str, time_lev: str) -> dict[str, VAR | list | Any]:
+def create_set(geo_lev: str, time_lev: str, restricted: bool = False) -> dict[str, VAR | list | Any]:
     """
+    :param restricted:
     :param geo_lev:
     :param time_lev:
     :return:
     """
-    path = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-
-    clean_df = part1(filepath=path, geo_lev=geo_lev, time_lev=time_lev)
+    clean_df = part1(geo_lev=geo_lev, time_lev=time_lev, type_key='train')
     pollution, w_speed, w_angle = part2(geo_lev=geo_lev, time_lev=time_lev)
     wind_spillover, space_spillover, w_matrix, ww_tensor = part3(clean_df, pollution, w_speed, w_angle,
                                                                  geo_lev=geo_lev, time_lev=time_lev)
-    print(wind_spillover)
 
-    return {"SWVAR(1) Model": part4(wind_spillover),
-            "SVAR(1) Model": part4(space_spillover),
-            "VAR(1) Model": VAR(pollution).fit(maxlags=1, trend='c'),
-            "AR(1) Models": ar_model(lags=1, pollution_data=pollution),
-            "Random Walk": random_walk(sigma=4, df=5, pollution_data=pollution, geo_level=geo_lev)}
+    if restricted:
+        return {"Restricted SWVAR(1) Model": part4(wind_spillover, restricted=True),
+                "SWVAR(1) Model": part4(wind_spillover),
+                "SVAR(1) Model": part4(space_spillover),
+                "VAR(1) Model": VAR(pollution).fit(maxlags=1, trend='c'),
+                "AR(1) Models": ar_model(lags=1, pollution_data=pollution),
+                "Random Walk": random_walk(sigma=4, df=5, pollution_data=pollution, geo_level=geo_lev)}
+    else:
+        return {"SWVAR(1) Model": part4(wind_spillover),
+                "SVAR(1) Model": part4(space_spillover),
+                "VAR(1) Model": VAR(pollution).fit(maxlags=1, trend='c'),
+                "AR(1) Models": ar_model(lags=1, pollution_data=pollution),
+                "Random Walk": random_walk(sigma=4, df=5, pollution_data=pollution, geo_level=geo_lev)}

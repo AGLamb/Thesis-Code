@@ -15,15 +15,21 @@ class Thesis_Process:
         self.aggregation_level = aggreg
         self.time_intervals = intervals
 
-    def run(self):
-        train_set = create_set(geo_lev=self.aggregation_level, time_lev=self.time_intervals)
+    def run(self) -> None:
+        train_set = create_set(geo_lev=self.aggregation_level,
+                               time_lev=self.time_intervals)
         print(f'Train set ready')
-        performance_set = get_performance(input_set=train_set, geo_lev=self.aggregation_level,
-                                          time_lev=self.time_intervals, func=self.performance_function)
+        performance_set = get_performance(input_set=train_set,
+                                          geo_lev=self.aggregation_level,
+                                          time_lev=self.time_intervals,
+                                          func=self.performance_function,
+                                          restricted=False)
         print(f'Performance set ready')
-        alphas = [0.5, 0.2, 0.1, 0.05]
+
+        alphas = [0.1, 0.05, 0.01, 0.001]
         for i in range(len(alphas)):
             print(ModelConfidenceSet(data=performance_set, alpha=alphas[i], B=3, w=1000).run().included)
+        return None
 
 
 def main():

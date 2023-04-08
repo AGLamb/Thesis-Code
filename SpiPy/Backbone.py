@@ -4,19 +4,15 @@ import pandas as pd
 import numpy as np
 
 
-def part1(geo_lev: str, time_lev: str, type_key: str) -> pd.DataFrame:
+def part1(geo_lev: str, time_lev: str) -> tuple:
     """
     :param type_key:
     :param geo_lev: granularity of the geographical division
     :param time_lev: granularity of the time interval
     :return: dataframe with the clean data
     """
-    if type_key == 'train':
-        path = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-        path2 = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
-    else:
-        path2 = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-        path = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
+    path_train = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
+    path_test = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
 
     if geo_lev == "street":
         geo_group = "name"
@@ -25,18 +21,20 @@ def part1(geo_lev: str, time_lev: str, type_key: str) -> pd.DataFrame:
 
     no_sensors = ["Uithoorn", "Velsen-Zuid", "Koog aan de Zaan", "Wijk aan Zee"]
 
-    data_df = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path),
-                                                       faulty=no_sensors), geo_lev, time_lev)
-
-    data_df2 = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path2),
+    train_df = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path_train),
                                                         faulty=no_sensors), geo_lev, time_lev)
-    misplaced = set(data_df[geo_group].unique()) - set(data_df2[geo_group].unique())
-    data = delete_places(df_input=data_df, pop_places=misplaced, key=geo_group)
-    data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv")
-    return data
+
+    test_df = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path_train),
+                                                       faulty=no_sensors), geo_lev, time_lev)
+    misplaced = set(train_df[geo_group].unique()) - set(test_df[geo_group].unique())
+    train_data = delete_places(df_input=train_df, pop_places=misplaced, key=geo_group)
+    test_data = delete_places(df_input=test_df, pop_places=misplaced, key=geo_group)
+    train_data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_train_data.csv")
+    test_data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_test_data.csv")
+    return train_data, test_data
 
 
-def delete_places(df_input: pd.DataFrame, pop_places: list, key: str) -> pd.DataFrame:
+def delete_places(df_input: pd.DataFrame, pop_places: set, key: str) -> pd.DataFrame:
     """
     :param key:
     :param pop_places:
@@ -51,25 +49,35 @@ def delete_places(df_input: pd.DataFrame, pop_places: list, key: str) -> pd.Data
         return df_input
 
 
-def part2(geo_lev: str, time_lev: str) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
+def part2(geo_lev: str, time_lev: str, type_key: str, save_data: bool = False) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
     """
+    :param save_data:
+    :param type_key:
     :param geo_lev: granularity of the geographical division
     :param time_lev: granularity of the time interval
     :return: individual dataframes for each variable
     """
-    filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_data.csv"
+    filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_" + type_key + "_data.csv"
     data = DataPrep.get_clean_data(filepath)
 
     pollution, w_speed, w_angle = DataPrep.matrix_creator(data, geo_lev)
-    pollution.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv")
-    w_speed.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_speed.csv")
-    w_angle.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_angle.csv")
+
+    if save_data:
+        pollution.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv")
+        w_speed.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_speed.csv")
+        w_angle.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_angle.csv")
     return pollution, w_speed, w_angle
 
 
-def part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
-          df_angle: pd.DataFrame, geo_lev: str, time_lev: str) -> (pd.DataFrame, np.ndarray):
+def part3(df_gen: pd.DataFrame,
+          df_pol: pd.DataFrame,
+          df_speed: pd.DataFrame,
+          df_angle: pd.DataFrame,
+          geo_lev: str,
+          time_lev: str,
+          save_data: bool = False) -> (pd.DataFrame, np.ndarray):
     """
+    :param save_data:
     :param df_gen: cleaned dataset
     :param df_pol: dataset of pollution levels
     :param df_speed: dataset of wind speeds
@@ -88,11 +96,12 @@ def part3(df_gen: pd.DataFrame, df_pol: pd.DataFrame, df_speed: pd.DataFrame,
     space_spillover_matrix = SpatialTools.spatial_tensor(df_pol, df_angle, df_speed, weight_matrix,
                                                          angle_matrix, tensor_type="space")
 
-    np.save("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "tensor_W.npy", tensor_w)
-    wind_spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
-                                 + "spillover_effects_wind.csv")
-    space_spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
-                                  + "spillover_effects_space.csv")
+    if save_data:
+        np.save("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "tensor_W.npy", tensor_w)
+        wind_spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
+                                     + "spillover_effects_wind.csv")
+        space_spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
+                                      + "spillover_effects_space.csv")
     return wind_spillover_matrix, space_spillover_matrix, weight_matrix, tensor_w
 
 

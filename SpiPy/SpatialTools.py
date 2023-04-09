@@ -16,30 +16,15 @@ def get_bearing(coor1: float, coor2: float) -> float:
 
 
 def coordinate_dict(df: pd.DataFrame, geo_level: str, pol: pd.DataFrame):
-    """
-    :param df: input dataset
-    :param geo_level: variable that defines the granularity of the geographical divisions
-    :param pol: dataset with the pollution level data
-    :return: A dictionary with all the locations and their averaged coordinates
-    """
-    if geo_level == "street":
-        geo_att = "name"
-    else:
-        geo_att = "tag"
     locations = list(pol.columns)
     c_dict = dict()
     for item in locations:
-        c_dict[item] = [df.loc[df[geo_att] == item, 'latitude'].mean(),
-                        df.loc[df[geo_att] == item, 'longitude'].mean()]
+        c_dict[item] = [df.loc[df[geo_level] == item, 'latitude'].mean(),
+                        df.loc[df[geo_level] == item, 'longitude'].mean()]
     return c_dict
 
 
 def weight_angle_matrix(loc_dict: dict) -> tuple[ndarray, ndarray]:
-    """
-    :param loc_dict: Dictionary with location names and corresponding coordinates
-    :return: Two matrices, one that contains the inverse of the distance between two points,
-             and the other contains the bearing between both points
-    """
     w_matrix = np.zeros((len(loc_dict), len(loc_dict)))
     angle_matrix = np.zeros((len(loc_dict), len(loc_dict)))
     locations = list(loc_dict.keys())
@@ -60,55 +45,38 @@ def spatial_tensor(pol: pd.DataFrame,
                    angle: pd.DataFrame,
                    wind: pd.DataFrame,
                    w_matrix: np.ndarray,
-                   angle_matrix: np.ndarray,
-                   tensor_type: str) -> (pd.DataFrame, np.ndarray):
-    """
-    :param pol: dataset of pollution levels
-    :param angle: dataset of wind direction
-    :param wind: dataset of wind speed
-    :param w_matrix: spatial weight matrix of the inverse distance between locations
-    :param angle_matrix: matrix with the bearing of two locations
-    :param tensor_type: conditional to see if wind should be included in the calculations or just distance
-    :return: dataframe with the spatial spillovers and possibly a tensor with the spatial interaction tensor
-             between time variant wind speed, wind direction and the inverse distance of the locations
-    """
+                   angle_matrix: np.ndarray) -> (pd.DataFrame, np.ndarray):
 
-    if tensor_type == "wind":
-        ww_tensor = np.zeros((len(angle), len(angle.columns), len(angle.columns)))
-        wwy = np.zeros((len(angle), len(pol.columns)))
+    ww_tensor = np.zeros((len(angle), len(angle.columns), len(angle.columns)))
+    wwy_wind = np.zeros((len(angle), len(pol.columns)))
+    wwy_space = np.zeros((len(angle), len(pol.columns)))
 
-        for i in range(len(angle)):
-            time_angle = angle.iloc[i, :].to_numpy()
-            time_speed = wind.iloc[i, :].to_numpy()
-            ww_tensor[i, :, :] = np.cos(angle_matrix - time_angle[np.newaxis, :])
-            ww_tensor[i, :, :] = ww_tensor[i, :, :] * time_speed[np.newaxis, :]
-            ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
+    row_sums = w_matrix.sum(axis=1)
+    w_matrix = w_matrix / row_sums[:, np.newaxis]
 
-            for j in range(len(angle.columns)):
-                ww_tensor[i, j, :] = ww_tensor[i, j, :] / np.sum(ww_tensor[i, j, :])
-                ww_tensor[i, j, j] = 1
+    for i in range(len(angle)):
+        time_angle = angle.iloc[i, :].to_numpy()
+        time_speed = wind.iloc[i, :].to_numpy()
+        ww_tensor[i, :, :] = np.cos(angle_matrix - time_angle[np.newaxis, :])
+        ww_tensor[i, :, :] = ww_tensor[i, :, :] * time_speed[np.newaxis, :]
+        ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
 
-            wwy[i, :] = ww_tensor[i, :, :] @ pol.iloc[i, :].T
+        row_sums = ww_tensor[i, :, :].sum(axis=1)
+        ww_tensor[i, :, :] = ww_tensor[i, :, :] / row_sums[:, np.newaxis]
 
-        wwy = pd.DataFrame(wwy)
-        for i in range(len(pol.columns)):
-            wwy.rename(columns={i: pol.columns[i]}, inplace=True)
+        wwy_wind[i, :] = ww_tensor[i, :, :] @ pol.iloc[i, :].T
+        wwy_space[i, :] = w_matrix @ pol.iloc[i, :].to_numpy()
 
-        wwy.set_index(pol.index, inplace=True)
-        return wwy, ww_tensor
+    wwy_wind = pd.DataFrame(wwy_wind)
+    wwy_space = pd.DataFrame(wwy_space)
+    for i in range(len(pol.columns)):
+        wwy_wind.rename(columns={i: pol.columns[i]}, inplace=True)
+        wwy_space.rename(columns={i: pol.columns[i]}, inplace=True)
 
-    else:
-        wwy = np.zeros((len(angle), len(pol.columns)))
-        for i in range(w_matrix.shape[0]):
-            w_matrix[i, :] = w_matrix[i, :] / np.sum(w_matrix[i, :])
-            w_matrix[i, i] = 1
+    wwy_wind.set_index(pol.index, inplace=True)
+    wwy_space.set_index(pol.index, inplace=True)
+    return wwy_wind, wwy_space, ww_tensor
 
-        for i in range(len(angle)):
-            wwy[i, :] = w_matrix @ pol.iloc[i, :].to_numpy()
 
-        wwy = pd.DataFrame(wwy)
-        for i in range(len(pol.columns)):
-            wwy.rename(columns={i: pol.columns[i]}, inplace=True)
-
-        wwy.set_index(pol.index, inplace=True)
-        return wwy
+def has_nan(matrix):
+    return np.isnan(matrix).any()

@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import Any
-import pandas as pd
-from statsmodels.tsa.ar_model import AutoRegResults
-from SpiPy.Backbone import part1, part2, part3, part4
+
+from SpiPy import SpatialRegression
 from SpiPy.Forecast import *
+from SpiPy.Backbone import *
 from statsmodels.tsa.api import VAR, AutoReg
 import numpy as np
 
@@ -12,72 +12,145 @@ np.random.seed(123)
 
 class ModelSet:
     def __init__(self,
-                 train_data: pd.DataFrame,
-                 test_data: pd.DataFrame,
-                 geo_lev: str,
-                 time_lev: str,
-                 restricted: bool = False) -> None:
+                 database: RunFlow,
+                 verbose: bool = False) -> None:
         self.random_walk = None
         self.ar_models = None
         self.var_model = None
         self.svar_model = None
         self.swvar_model = None
-        self.res_swvar_model = None
-        self.geo_lev = geo_lev
-        self.time_lev = time_lev
-        self.restricted = restricted
-        self.train_data = train_data
-        self.test_data = test_data
+        self.constant_model = None
+        self.diagonal_model = None
+        self.ard_model = None
+        self.database = database
+        self.verbose = verbose
 
     def run(self) -> None:
-        pollution, w_speed, w_angle = part2(geo_lev=self.geo_lev, time_lev=self.time_lev, type_key='train')
-        wind_spillover, space_spillover, w_matrix, ww_tensor = part3(df_gen=self.train_data,
-                                                                     df_pol=pollution,
-                                                                     df_speed=w_speed,
-                                                                     df_angle=w_angle,
-                                                                     geo_lev=self.geo_lev,
-                                                                     time_lev=self.time_lev)
-        self.swvar_model = part4(wind_spillover, restricted=False)
-        self.svar_model = part4(space_spillover, restricted=False)
-        self.var_model = VAR(pollution).fit(maxlags=1, trend='n')
-        self.ar_models = ar_model(pollution_data=pollution)
-        self.random_walk = random_walk(sigma=4, df=5, pollution_data=pollution)
-        if self.restricted:
-            self.res_swvar_model = part4(wind_spillover, restricted=True)
+        self.ard_model = self.regress(endog=self.database.train_data.pollution,
+                                      exog=self.database.train_data.wSpillovers,
+                                      model_type="ARD")
+        self.diagonal_model = self.regress(endog=self.database.train_data.pollution,
+                                           exog=self.database.train_data.wSpillovers,
+                                           model_type="Diagonal")
+        # self.constant_model = self.regress(endog=self.database.train_data.pollution,
+        #                                    exog=self.database.train_data.wSpillovers,
+        #                                    model_type="Constant")
+        self.swvar_model = self.regress(endog=self.database.train_data.pollution,
+                                        exog=self.database.train_data.wSpillovers,
+                                        model_type="Unrestricted")
+        self.svar_model = self.regress(endog=self.database.train_data.pollution,
+                                       exog=self.database.train_data.sSpillovers,
+                                       model_type="Unrestricted")
+        self.var_model = VAR(endog=self.database.train_data.pollution).fit(maxlags=1, trend='n')
+        self.ar_models = ar_model(pollution_data=self.database.train_data.pollution)
+        self.random_walk = random_walk(sigma=10, df=5, pollution_data=self.database.train_data.pollution)
         return None
 
-    def get_performance(self) -> ForecastSet:
-        performance = ForecastSet(trained_set=self)
-        performance.run(test_data=self.test_data)
+    def get_performance(self, time_lev: str) -> ForecastSet:
+        performance = ForecastSet(time_lev=time_lev)
+        performance.run(trained_set=self)
         return performance
+
+    def regress(self, endog: pd.DataFrame = None, exog: pd.DataFrame = None, model_type: str = "Unrestricted") -> Any:
+        model = SpatialRegression.SpatialVAR(endog=endog,
+                                             exog=exog,
+                                             model_type=model_type,
+                                             verbose=self.verbose)
+        model.fit()
+        return model
 
 
 class ForecastSet:
-    def __init__(self,
-                 trained_set: ModelSet,
-                 data: pd.DataFrame = None) -> None:
-        self.train_set = trained_set
-        self.data = data
-        self.forecast_steps = 365 if self.train_set.time_lev == "day" else (365 * 24)
+    def __init__(self, time_lev) -> None:
+        self.forecast_steps = 365 if time_lev == "day" else (365 * 24)
         self.performance = {"MAPE": {}, "MSE": {}, "RMSE": {}, "MAE": {}, "SMAPE": {}}
         self.metric_func = [MAPE, MSE, RMSE, MAE, SMAPE]
 
-    def run(self, test_data: pd.DataFrame) -> None:
-        clean_pollution, weight_matrix, w_tensor = self.get_test_data(test_data=test_data)
+    def run(self, trained_set: ModelSet) -> None:
         self.random_walk_forecast(sigma=1,
                                   df=5,
-                                  pollution=clean_pollution)
-        self.ar_forecast(pollution=clean_pollution)
-        self.var_forecast(pollution=clean_pollution)
-        self.svar_forecast(pollution=clean_pollution,
-                           w_matrix=weight_matrix)
-        self.swvar_forecast(pollution=clean_pollution,
-                            ww_tensor=w_tensor)
-
-        if self.train_set.restricted:
-            self.restricted_forecast(pollution=clean_pollution)
+                                  trained_set=trained_set)
+        self.ar_forecast(trained_set=trained_set)
+        self.var_forecast(trained_set=trained_set)
+        self.svar_forecast(trained_set=trained_set)
+        self.swvar_forecast(trained_set=trained_set)
+        # self.const_forecast(trained_set=trained_set)
+        self.diag_forecast(trained_set=trained_set)
+        self.ard_forecast(trained_set=trained_set)
 
         self.output_maker()
+        return None
+
+    def const_forecast(self, trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
+        ww_tensor = trained_set.database.test_data.weight_tensor
+        Beta = trained_set.constant_model.params
+
+        t = self.forecast_steps
+        k = len(pollution.columns)
+        pred = np.zeros((t, k))
+
+        for func in self.metric_func:
+            self.performance[func.__name__]["Constant"] = []
+
+        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta
+        for func in self.metric_func:
+            self.performance[func.__name__]["Constant"].append(func(pollution.iloc[0, :].to_numpy(), pred[0, :]))
+
+        for i in range(1, t):
+            argument = ww_tensor[i - 1, :, :] @ pred[i - 1, :].T
+            pred[i, :] = (Beta.T @ argument).T
+
+            for func in self.metric_func:
+                self.performance[func.__name__]["Constant"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
+        return None
+
+    def diag_forecast(self, trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
+        ww_tensor = trained_set.database.test_data.weight_tensor
+        Beta = trained_set.diagonal_model.params
+
+        t = self.forecast_steps
+        k = len(pollution.columns)
+        pred = np.zeros((t, k))
+        for func in self.metric_func:
+            self.performance[func.__name__]["Diagonal"] = []
+
+        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta
+        for func in self.metric_func:
+            self.performance[func.__name__]["Diagonal"].append(func(pollution.iloc[0, :].to_numpy(), pred[0, :]))
+
+        for i in range(1, t):
+            argument = ww_tensor[i - 1, :, :] @ pred[i - 1, :].T
+            pred[i, :] = (Beta.T @ argument).T
+
+            for func in self.metric_func:
+                self.performance[func.__name__]["Diagonal"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
+        return None
+
+    def ard_forecast(self, trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
+        ww_tensor = trained_set.database.test_data.weight_tensor
+        Beta = trained_set.ard_model.params
+        Phi = trained_set.ard_model.phi
+
+        t = self.forecast_steps
+        k = len(pollution.columns)
+        pred = np.zeros((t, k))
+        for func in self.metric_func:
+            self.performance[func.__name__]["ARD"] = []
+
+        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta + \
+                     pollution.iloc[-1, :].to_numpy() @ Phi
+        for func in self.metric_func:
+            self.performance[func.__name__]["ARD"].append(func(pollution.iloc[0, :].to_numpy(), pred[0, :]))
+
+        for i in range(1, t):
+            argument = ww_tensor[i - 1, :, :] @ pred[i - 1, :].T
+            pred[i, :] = (Beta.T @ argument + pollution.iloc[i - 1, :].to_numpy() @ Phi).T
+
+            for func in self.metric_func:
+                self.performance[func.__name__]["ARD"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
         return None
 
     def output_maker(self) -> None:
@@ -90,26 +163,19 @@ class ForecastSet:
         for func in self.metric_func:
             output[func.__name__] = func(y_true, y_pred)
 
-    def get_test_data(self, test_data: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
-        pollution, w_speed, w_angle = part2(geo_lev=self.train_set.geo_lev,
-                                            time_lev=self.train_set.time_lev,
-                                            type_key='test')
-        wind_spillover, space_spillover, w_array, ww_tensor = part3(df_gen=test_data,
-                                                                    df_pol=pollution,
-                                                                    df_speed=w_speed,
-                                                                    df_angle=w_angle,
-                                                                    geo_lev=self.train_set.geo_lev,
-                                                                    time_lev=self.train_set.time_lev)
-        return pollution, w_array, ww_tensor
+    def random_walk_forecast(self,
+                             sigma: float,
+                             df: int,
+                             trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
 
-    def random_walk_forecast(self, sigma: float, df: int,
-                             pollution: pd.DataFrame) -> None:
         t = self.forecast_steps
         k = len(pollution.columns)
 
         pred = np.zeros((t, k))
         eps = np.random.standard_t(df, size=(t, k)) * sigma
-        pred[0, :] = self.train_set.random_walk[-1, :k] + eps[0, :]
+        pred[0, :] = trained_set.random_walk[-1, :] + eps[0, :]
+
         for func in self.metric_func:
             self.performance[func.__name__]["RW"] = []
 
@@ -121,8 +187,8 @@ class ForecastSet:
                 self.performance[func.__name__]["RW"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
         return None
 
-    def ar_forecast(self, pollution: pd.DataFrame) -> None:
-
+    def ar_forecast(self, trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
         t = self.forecast_steps
         k = len(pollution.columns)
         pred = np.zeros((t, k))
@@ -130,16 +196,17 @@ class ForecastSet:
             self.performance[func.__name__]["AR"] = []
 
         for i, col in enumerate(pollution):
-            pred[:, i] = self.train_set.ar_models[col].forecast(steps=t)
+            pred[:, i] = trained_set.ar_models[col].forecast(steps=t)
 
         for i in range(t):
             for func in self.metric_func:
                 self.performance[func.__name__]["AR"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
         return None
 
-    def var_forecast(self, pollution: pd.DataFrame) -> None:
+    def var_forecast(self, trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
         t = self.forecast_steps
-        pred = self.train_set.var_model.forecast(y=self.train_set.var_model.endog, steps=t)
+        pred = trained_set.var_model.forecast(y=trained_set.var_model.endog, steps=t)
         for func in self.metric_func:
             self.performance[func.__name__]["VAR"] = []
 
@@ -148,62 +215,54 @@ class ForecastSet:
                 self.performance[func.__name__]["VAR"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
         return None
 
-    def svar_forecast(self, pollution: pd.DataFrame, w_matrix: np.ndarray) -> None:
+    def svar_forecast(self, trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
+        w_matrix = trained_set.database.test_data.weight_matrix
+        Beta = trained_set.svar_model.params
+
         t = self.forecast_steps
         k = len(pollution.columns)
         pred = np.zeros((t, k))
         for func in self.metric_func:
             self.performance[func.__name__]["SVAR"] = []
 
-        argument = w_matrix @ self.train_set.svar_model.endog[-1, :].T
-        print(argument)
-        pred[0, :] = (self.train_set.svar_model.params.T @ argument).T
-        print(pred[0, :])
+        pred[0, :] = (Beta.T @ trained_set.svar_model.endog.iloc[-1, :].to_numpy().T).T
         for func in self.metric_func:
             self.performance[func.__name__]["SVAR"].append(func(pollution.iloc[0, :].to_numpy(), pred[0, :]))
 
         for i in range(1, t):
             argument = w_matrix @ pred[i - 1, :].T
-            print(argument)
-            pred[i, :] = (self.train_set.svar_model.params.T @ argument).T
-            print(pred[i, :])
+            pred[i, :] = (Beta.T @ argument).T
+
             for func in self.metric_func:
                 self.performance[func.__name__]["SVAR"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
         return None
 
-    def swvar_forecast(self, pollution: pd.DataFrame, ww_tensor: np.ndarray) -> None:
+    def swvar_forecast(self, trained_set: ModelSet) -> None:
+        pollution = trained_set.database.test_data.pollution
+        ww_tensor = trained_set.database.test_data.weight_tensor
+        Beta = trained_set.swvar_model.params
+
         t = self.forecast_steps
         k = len(pollution.columns)
         pred = np.zeros((t, k))
         for func in self.metric_func:
             self.performance[func.__name__]["SWVAR"] = []
 
-        argument = ww_tensor[0, :, :] @ self.train_set.swvar_model.endog[-1, :].T
-        print(argument)
-        pred[0, :] = (self.train_set.swvar_model.params.T @ argument).T
-        print(pred[0, :])
+        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta
         for func in self.metric_func:
-            self.performance[func.__name__]["SWVAR"].append(func(pollution.iloc[0, :].to_numpy(), pred[0, :]))
+            self.performance[func.__name__]["SWVAR"].append(func(pollution.iloc[0, :], pred[0, :]))
 
         for i in range(1, t):
-            argument = ww_tensor[i, :, :] @ pred[i - 1, :].T
-            print(argument)
-            pred[i, :] = (self.train_set.swvar_model.params.T @ argument).T
-            print(pred[i, :])
+            argument = ww_tensor[i - 1, :, :] @ pred[i - 1, :].T
+            pred[i, :] = (Beta.T @ argument).T
+
             for func in self.metric_func:
-                self.performance[func.__name__]["SWVAR"].append(func(pollution.iloc[i, :].to_numpy(), pred[i, :]))
-        return None
-
-    def restricted_forecast(self, pollution: pd.DataFrame) -> None:
-        t = self.forecast_steps
-        k = len(pollution.columns)
-        pred = np.zeros((t, k))
-        for func in self.metric_func:
-            self.performance[func.__name__]["SWVAR"] = []
+                self.performance[func.__name__]["SWVAR"].append(func(pollution.iloc[i, :], pred[i, :]))
         return None
 
 
-def ar_model(pollution_data: pd.DataFrame) -> dict[Any, AutoRegResults]:
+def ar_model(pollution_data: pd.DataFrame) -> dict[Any, Any]:
     output_models = {}
     for column in pollution_data:
         output_models[column] = AutoReg(pollution_data[column], lags=1, trend='n').fit()

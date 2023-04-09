@@ -1,118 +1,199 @@
-from SpiPy import DataPrep, SpatialTools, SpatialRegression
-from statsmodels.tsa.vector_ar.var_model import VARResults
+from __future__ import annotations
+from SpiPy import SpatialTools
 import pandas as pd
 import numpy as np
 
 
-def part1(geo_lev: str, time_lev: str) -> tuple:
-    """
-    :param type_key:
-    :param geo_lev: granularity of the geographical division
-    :param time_lev: granularity of the time interval
-    :return: dataframe with the clean data
-    """
-    path_train = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-    path_test = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
+class DataBase:
+    def __init__(self,
+                 filepath: str,
+                 faulty: list,
+                 geo_level: str,
+                 time_interval: str) -> None:
 
-    if geo_lev == "street":
-        geo_group = "name"
-    else:
-        geo_group = "tag"
+        self.data = None
+        self.path = filepath
+        self.faulty_sensors = faulty
+        self.geo_lev = "name" if geo_level == "street" else "tag"
+        self.time_lev = "YYYYMMDD" if time_interval == "day" else "timestamp"
+        self.pollution = None
+        self.wind_speed = None
+        self.wind_direction = None
+        self.weight_matrix = None
+        self.angle_matrix = None
+        self.weight_tensor = None
+        self.sSpillovers = None
+        self.wSpillovers = None
+        self.coordinate_dict = None
 
-    no_sensors = ["Uithoorn", "Velsen-Zuid", "Koog aan de Zaan", "Wijk aan Zee"]
+    def run(self) -> None:
+        self.matrix_creator()
+        return None
 
-    train_df = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path_train),
-                                                        faulty=no_sensors), geo_lev, time_lev)
+    def get_data(self) -> None:
+        self.data = pd.read_csv(self.path)
+        self.format_data()
+        self.group_data()
+        return None
 
-    test_df = DataPrep.group_data(DataPrep.format_data(DataPrep.get_data(path_train),
-                                                       faulty=no_sensors), geo_lev, time_lev)
-    misplaced = set(train_df[geo_group].unique()) - set(test_df[geo_group].unique())
-    train_data = delete_places(df_input=train_df, pop_places=misplaced, key=geo_group)
-    test_data = delete_places(df_input=test_df, pop_places=misplaced, key=geo_group)
-    train_data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_train_data.csv")
-    test_data.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_test_data.csv")
-    return train_data, test_data
+    def format_data(self) -> None:
+
+        self.data["FH"] = self.data["FH"] * 0.36
+        self.data.drop(['id', 'no2', 'pm10', 'pm10_cal', 'pm10_fac', 'pm10_max', 'pm10_min', 'pm25_cal',
+                        'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
+                        'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
+                       axis=1, inplace=True)
+
+        for i in range(len(self.data)):
+            self.data.at[i, 'DD'] = angle_correction(self.data.at[i, 'DD'])
+
+        self.data.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
+        self.delete_entries(pop_values=self.faulty_sensors, key=self.geo_lev)
+        return None
+
+    def delete_entries(self, pop_values: set | list, key: str) -> None:
+        if len(pop_values) > 0:
+            self.data = self.data[~self.data[key].isin(pop_values)]
+        else:
+            pass
+
+    def group_data(self) -> None:
+        grouped_df = self.data.groupby(by=[self.geo_lev, self.time_lev]).median().copy().reset_index()
+        grouped_df["Date"] = pd.to_datetime(grouped_df[self.time_lev])
+
+        if self.time_lev == "YYYYMMDD":
+            grouped_df.drop(columns=["YYYYMMDD"], inplace=True)
+        else:
+            grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
+
+        grouped_df.set_index("Date", inplace=True)
+        self.data = grouped_df
+        return None
+
+    def matrix_creator(self) -> None:
+        df = self.data.drop(columns=["latitude", "longitude"]).copy(deep=True)
+        unique_names = df[self.geo_lev].unique()
+
+        df_pol = pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "pm25"])
+        df_pol.rename(columns={"pm25": unique_names[0]}, inplace=True)
+        df_wind = pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Speed"])
+        df_wind.rename(columns={"Wind Speed": unique_names[0]}, inplace=True)
+        df_angle = pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Angle"])
+        df_angle.rename(columns={"Wind Angle": unique_names[0]}, inplace=True)
+
+        for i in range(1, len(unique_names)):
+            df_pol = df_pol.combine_first(pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "pm25"]))
+            df_pol.rename(columns={"pm25": unique_names[i]}, inplace=True)
+
+            df_wind = df_wind.combine_first(pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Speed"]))
+            df_wind.rename(columns={"Wind Speed": unique_names[i]}, inplace=True)
+
+            df_angle = df_angle.combine_first(pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Angle"]))
+            df_angle.rename(columns={"Wind Angle": unique_names[i]}, inplace=True)
+
+        for column in df_pol:
+            median_values = (df_pol[column].median(), df_angle[column].median(), df_wind[column].median())
+            df_pol[column].fillna(value=median_values[0], inplace=True)
+            df_angle[column].fillna(value=median_values[1], inplace=True)
+            df_wind[column].fillna(value=median_values[2], inplace=True)
+
+        self.pollution = invalid_values(df_pol)
+        self.wind_speed = invalid_values(df_wind)
+        self.wind_direction = invalid_values(df_angle)
+        return None
+
+    def SpatialComponents(self) -> None:
+        self.coordinate_dict = SpatialTools.coordinate_dict(df=self.data, geo_level=self.geo_lev, pol=self.pollution)
+        self.weight_matrix, self.angle_matrix = SpatialTools.weight_angle_matrix(self.coordinate_dict)
+        self.wSpillovers, self.sSpillovers, self.weight_tensor = SpatialTools.spatial_tensor(self.pollution,
+                                                                                             self.wind_direction,
+                                                                                             self.wind_speed,
+                                                                                             self.weight_matrix,
+                                                                                             self.angle_matrix)
+        return None
 
 
-def delete_places(df_input: pd.DataFrame, pop_places: set, key: str) -> pd.DataFrame:
-    """
-    :param key:
-    :param pop_places:
-    :param df_input: dataset to analyse
-    :return: dataset without the removed sensors
-    """
-    if len(pop_places) > 0:
-        df = df_input.copy()
-        df = df[~df[key].isin(pop_places)]
-        return df
-    else:
-        return df_input
+class RunFlow:
+    def __init__(self, save: bool = False) -> None:
+        self.train_data = None
+        self.test_data = None
+        self.save_data = save
+
+    def run(self, geo_lev: str, time_lev: str) -> None:
+        path_train = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
+        path_test = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
+
+        no_sensors = ["Uithoorn", "Velsen-Zuid", "Koog aan de Zaan", "Wijk aan Zee"]
+
+        self.train_data = DataBase(filepath=path_train,
+                                   faulty=no_sensors,
+                                   geo_level=geo_lev,
+                                   time_interval=time_lev)
+        self.test_data = DataBase(filepath=path_test,
+                                  faulty=no_sensors,
+                                  geo_level=geo_lev,
+                                  time_interval=time_lev)
+
+        self.train_data.get_data()
+        self.test_data.get_data()
+
+        train_names = set(self.train_data.data[self.train_data.geo_lev].unique())
+        test_names = set(self.test_data.data[self.test_data.geo_lev].unique())
+
+        misplaced = (train_names - test_names) | (test_names - train_names)
+
+        self.train_data.delete_entries(pop_values=misplaced, key=self.train_data.geo_lev)
+        self.test_data.delete_entries(pop_values=misplaced, key=self.test_data.geo_lev)
+
+        self.train_data.run()
+        self.test_data.run()
+        self.train_data.SpatialComponents()
+        self.test_data.SpatialComponents()
+
+        if self.save_data:
+            self.data_saver()
+        return None
+
+    def data_saver(self) -> None:
+        common_path = "/Users/main/Vault/Thesis/Data/" + self.train_data.time_lev + "/" + self.train_data.geo_lev
+
+        self.train_data.data.to_csv(common_path + "/Cleaned_train_data.csv")
+        self.train_data.pollution.to_csv(common_path + "/train_pollution.csv")
+        self.train_data.wind_speed.to_csv(common_path + "/train_wind_speed.csv")
+        self.train_data.wind_direction.to_csv(common_path + "/train_wind_angle.csv")
+        self.train_data.wSpillovers.to_csv(common_path + "/spillover_effects_wind.csv")
+        self.train_data.sSpillovers.to_csv(common_path + "/spillover_effects_space.csv")
+        np.save(common_path + "/tensor_W_train.npy", self.train_data.weight_tensor)
+
+        self.test_data.data.to_csv(common_path + "/Cleaned_test_data.csv")
+        self.test_data.pollution.to_csv(common_path + "/test_pollution.csv")
+        self.test_data.wind_speed.to_csv(common_path + "/test_wind_speed.csv")
+        self.test_data.wind_direction.to_csv(common_path + "/test_wind_angle.csv")
+        self.test_data.wSpillovers.to_csv(common_path + "/spillover_effects_wind.csv")
+        self.test_data.sSpillovers.to_csv(common_path + "/spillover_effects_space.csv")
+        np.save(common_path + "/tensor_W_test.npy", self.test_data.weight_tensor)
+        return None
 
 
-def part2(geo_lev: str, time_lev: str, type_key: str, save_data: bool = False) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
-    """
-    :param save_data:
-    :param type_key:
-    :param geo_lev: granularity of the geographical division
-    :param time_lev: granularity of the time interval
-    :return: individual dataframes for each variable
-    """
-    filepath = "/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "Cleaned_" + type_key + "_data.csv"
-    data = DataPrep.get_clean_data(filepath)
+def invalid_values(df: pd.DataFrame) -> pd.DataFrame:
+    output_df = df.copy()
+    output_df.reset_index(inplace=True, drop=True)
+    for index, row in output_df.iterrows():
+        if (row > 0).all():
+            continue
+        for col in output_df.columns:
+            if row[col] <= 0:
+                prev_val = output_df.iloc[max(index - 1, 0)][col]
+                next_val = output_df.iloc[min(index + 1, len(output_df) - 1)][col]
+                new_val = (prev_val + next_val) / 2
+                output_df.at[index, col] = new_val
 
-    pollution, w_speed, w_angle = DataPrep.matrix_creator(data, geo_lev)
-
-    if save_data:
-        pollution.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "pollution.csv")
-        w_speed.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_speed.csv")
-        w_angle.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "wind_angle.csv")
-    return pollution, w_speed, w_angle
+    output_df.set_index(df.index, inplace=True)
+    return output_df
 
 
-def part3(df_gen: pd.DataFrame,
-          df_pol: pd.DataFrame,
-          df_speed: pd.DataFrame,
-          df_angle: pd.DataFrame,
-          geo_lev: str,
-          time_lev: str,
-          save_data: bool = False) -> (pd.DataFrame, np.ndarray):
-    """
-    :param save_data:
-    :param df_gen: cleaned dataset
-    :param df_pol: dataset of pollution levels
-    :param df_speed: dataset of wind speeds
-    :param df_angle: dataset of wind directions
-    :param geo_lev: granularity of the geographical division
-    :param time_lev: granularity of the time interval
-    :return: dataframe with spatial spillover effects
-    """
-
-    coordinates = SpatialTools.coordinate_dict(df_gen, geo_lev, df_pol)
-    weight_matrix, angle_matrix = SpatialTools.weight_angle_matrix(coordinates)
-
-    wind_spillover_matrix, tensor_w = SpatialTools.spatial_tensor(df_pol, df_angle, df_speed,
-                                                                  weight_matrix, angle_matrix,
-                                                                  tensor_type="wind")
-    space_spillover_matrix = SpatialTools.spatial_tensor(df_pol, df_angle, df_speed, weight_matrix,
-                                                         angle_matrix, tensor_type="space")
-
-    if save_data:
-        np.save("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/" + "tensor_W.npy", tensor_w)
-        wind_spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
-                                     + "spillover_effects_wind.csv")
-        space_spillover_matrix.to_csv("/Users/main/Vault/Thesis/Data/" + time_lev + "/" + geo_lev + "/"
-                                      + "spillover_effects_space.csv")
-    return wind_spillover_matrix, space_spillover_matrix, weight_matrix, tensor_w
-
-
-def part4(spillovers: pd.DataFrame, restricted: bool = False) -> VARResults:
-    """
-    :param restricted:
-    :param spillovers: dataset with spatial spillover effects
-    :return: VAR model
-    """
-    if restricted:
-        spatial_model = SpatialRegression.restricted_spatial_VAR(spillovers)
-    else:
-        spatial_model = SpatialRegression.spatial_VAR(spillovers)
-    return spatial_model
+def angle_correction(angle: int) -> int:
+    if angle > 360:
+        angle -= 360
+        angle = angle_correction(angle)
+    return angle

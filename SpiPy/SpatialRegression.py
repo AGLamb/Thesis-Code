@@ -82,3 +82,6 @@ class SpatialVAR:
     def fit_constant(self) -> None:
         variables = self.endog.columns
         return None
+
+    def fit_smooth_transition(self) -> None:
+        return None

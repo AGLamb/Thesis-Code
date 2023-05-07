@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 from statsmodels.tsa.ar_model import AutoReg
-from statsmodels.tsa.api import VAR
 from statsmodels.api import OLS
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
+from pandas import DataFrame
+from numpy import zeros
 
 
 class SpatialVAR:
     def __init__(
             self, lags: int = 1,
             constant: bool = False,
-            endog: pd.DataFrame = None,
-            exog: pd.DataFrame = None,
+            endog: DataFrame = None,
+            exog: DataFrame = None,
             model_type: str = "Unrestricted",
             verbose: bool = True
     ) -> None:
@@ -47,8 +45,8 @@ class SpatialVAR:
             if self.verbose:
                 print(output_models[column].summary())
 
-        self.params = np.zeros((n, n))
-        self.phi = np.zeros((n, n))
+        self.params = zeros((n, n))
+        self.phi = zeros((n, n))
         for i in range(n):
             self.params[i, i] = output_models[self.endog.columns[i]].params[1]
             self.phi[i, i] = output_models[self.endog.columns[i]].params[0]
@@ -72,16 +70,16 @@ class SpatialVAR:
             if self.verbose:
                 print(output_models[column].summary())
 
-        self.params = np.zeros((n, n))
+        self.params = zeros((n, n))
 
         for i in range(n):
             self.params[i, i] = output_models[self.endog.columns[i]].params[0]
         self.fitted_model = output_models
         return None
 
-    def fit_constant(self) -> None:
-        variables = self.endog.columns
-        return None
+# def fit_constant(self) -> None:
+#      variables = self.endog.columns
+#      return None
 
-    def fit_smooth_transition(self) -> None:
-        return None
+# def fit_smooth_transition() -> None:
+#     return None

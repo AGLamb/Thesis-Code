@@ -6,7 +6,7 @@ import numpy as np
 
 def bootstrap_sample(data, B, w):
     """
-    Bootstrap the input data
+    Bootstrap the input
     data: input numpy data array
     B: boostrap size
     w: block length of the boostrap
@@ -158,14 +158,16 @@ class ModelConfidenceSet(object):
     def __init__(self, data, alpha, B, w, algorithm="SQ", names=None):
         """
         Implementation of Econometrica Paper:
-        Hansen, Peter R., Asger Lunde, and James M. Nason. "The model confidence set." Econometrica 79.2 (2011): 453-497.
+        Hansen, Peter R., Asger Lunde, and James M. Nason.
+        "The model confidence set." Econometrica 79.2 (2011): 453-497.
 
         Input:
             data->pandas.DataFrame or numpy.ndarray: input data, columns are the losses of each model
             alpha->float: confidence level
             B->int: bootstrap size for computation covariance
             w->int: block size for bootstrap sampling
-            algorithm->str: SQ or R, SQ is the first t-statistics in Hansen (2011) p.465, and R is the second t-statistics
+            algorithm->str: SQ or R, SQ is the first t-statistics in Hansen (2011)
+            p.465, and R is the second t-statistics
             names->list: the name of each model (corresponding to each columns).
 
         Method:
@@ -174,8 +176,12 @@ class ModelConfidenceSet(object):
         Attributes:
             included: models that are in the model confidence sets at confidence level of alpha
             excluded: models that are NOT in the model confidence sets at confidence level of alpha
-            pvalues: the bootstrap p-values of each models
+            values: the bootstrap p-values of each models
         """
+
+        self.pvalues = None
+        self.included = None
+        self.excluded = None
 
         if isinstance(data, pd.DataFrame):
             self.data = data.values

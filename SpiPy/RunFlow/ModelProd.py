@@ -1,13 +1,13 @@
 from __future__ import annotations
 from typing import Any
 
-from SpiPy import SpatialRegression
-from SpiPy.Forecast import *
-from SpiPy.Backbone import *
 from statsmodels.tsa.api import VAR, AutoReg
-import numpy as np
+from SpiPy.Models import SpatialRegression
+from SpiPy.RunFlow.Backbone import *
+from SpiPy.Utils.Forecast import *
+from numpy import random, zeros
 
-np.random.seed(123)
+random.seed(123)
 
 
 class ModelSet:
@@ -51,7 +51,7 @@ class ModelSet:
         performance.run(trained_set=self)
         return performance
 
-    def regress(self, endog: pd.DataFrame = None, exog: pd.DataFrame = None, model_type: str = "Unrestricted") -> Any:
+    def regress(self, endog: DataFrame = None, exog: DataFrame = None, model_type: str = "Unrestricted") -> Any:
         model = SpatialRegression.SpatialVAR(endog=endog,
                                              exog=exog,
                                              model_type=model_type,
@@ -88,7 +88,7 @@ class ForecastSet:
 
         t = self.forecast_steps
         k = len(pollution.columns)
-        pred = np.zeros((t, k))
+        pred = zeros((t, k))
 
         for func in self.metric_func:
             self.performance[func.__name__]["Constant"] = []
@@ -112,7 +112,7 @@ class ForecastSet:
 
         t = self.forecast_steps
         k = len(pollution.columns)
-        pred = np.zeros((t, k))
+        pred = zeros((t, k))
         for func in self.metric_func:
             self.performance[func.__name__]["Diagonal"] = []
 
@@ -136,12 +136,12 @@ class ForecastSet:
 
         t = self.forecast_steps
         k = len(pollution.columns)
-        pred = np.zeros((t, k))
+        pred = zeros((t, k))
         for func in self.metric_func:
             self.performance[func.__name__]["ARD"] = []
 
-        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta + \
-                     pollution.iloc[-1, :].to_numpy() @ Phi
+        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta
+        pred[0, :] += pollution.iloc[-1, :].to_numpy() @ Phi
         for func in self.metric_func:
             self.performance[func.__name__]["ARD"].append(func(pollution.iloc[0, :].to_numpy(), pred[0, :]))
 
@@ -155,10 +155,10 @@ class ForecastSet:
 
     def output_maker(self) -> None:
         for func in self.metric_func:
-            self.performance[func.__name__] = pd.DataFrame(self.performance[func.__name__])
+            self.performance[func.__name__] = DataFrame(self.performance[func.__name__])
         return None
 
-    def get_performance(self, y_true: np.ndarray, y_pred: np.ndarray) -> None:
+    def get_performance(self, y_true: ndarray, y_pred: ndarray) -> None:
         output = {}
         for func in self.metric_func:
             output[func.__name__] = func(y_true, y_pred)
@@ -172,8 +172,8 @@ class ForecastSet:
         t = self.forecast_steps
         k = len(pollution.columns)
 
-        pred = np.zeros((t, k))
-        eps = np.random.standard_t(df, size=(t, k)) * sigma
+        pred = zeros((t, k))
+        eps = random.standard_t(df, size=(t, k)) * sigma
         pred[0, :] = trained_set.random_walk[-1, :] + eps[0, :]
 
         for func in self.metric_func:
@@ -191,7 +191,7 @@ class ForecastSet:
         pollution = trained_set.database.test_data.pollution
         t = self.forecast_steps
         k = len(pollution.columns)
-        pred = np.zeros((t, k))
+        pred = zeros((t, k))
         for func in self.metric_func:
             self.performance[func.__name__]["AR"] = []
 
@@ -222,7 +222,7 @@ class ForecastSet:
 
         t = self.forecast_steps
         k = len(pollution.columns)
-        pred = np.zeros((t, k))
+        pred = zeros((t, k))
         for func in self.metric_func:
             self.performance[func.__name__]["SVAR"] = []
 
@@ -245,7 +245,7 @@ class ForecastSet:
 
         t = self.forecast_steps
         k = len(pollution.columns)
-        pred = np.zeros((t, k))
+        pred = zeros((t, k))
         for func in self.metric_func:
             self.performance[func.__name__]["SWVAR"] = []
 
@@ -262,18 +262,18 @@ class ForecastSet:
         return None
 
 
-def ar_model(pollution_data: pd.DataFrame) -> dict[Any, Any]:
+def ar_model(pollution_data: DataFrame) -> dict[Any, Any]:
     output_models = {}
     for column in pollution_data:
         output_models[column] = AutoReg(pollution_data[column], lags=1, trend='n').fit()
     return output_models
 
 
-def random_walk(sigma: float, df: int, pollution_data: pd.DataFrame) -> np.array:
+def random_walk(sigma: float, df: int, pollution_data: DataFrame) -> ndarray:
     t = len(pollution_data)
     k = len(pollution_data.columns)
-    eps = np.random.standard_t(df, size=(t, k)) * sigma
-    data = np.zeros((t, k))
+    eps = random.standard_t(df, size=(t, k)) * sigma
+    data = zeros((t, k))
     data[0, :] = eps[0, :]
 
     for i in range(1, t):

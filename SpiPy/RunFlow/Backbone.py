@@ -1,7 +1,8 @@
 from __future__ import annotations
-from SpiPy import SpatialTools
-import pandas as pd
-import numpy as np
+
+from pandas import DataFrame, read_csv, to_datetime
+from SpiPy.Utils import SpatialTools
+from numpy import save
 
 
 class DataBase:
@@ -31,7 +32,7 @@ class DataBase:
         return None
 
     def get_data(self) -> None:
-        self.data = pd.read_csv(self.path)
+        self.data = read_csv(self.path)
         self.format_data()
         self.group_data()
         return None
@@ -59,7 +60,7 @@ class DataBase:
 
     def group_data(self) -> None:
         grouped_df = self.data.groupby(by=[self.geo_lev, self.time_lev]).median().copy().reset_index()
-        grouped_df["Date"] = pd.to_datetime(grouped_df[self.time_lev])
+        grouped_df["Date"] = to_datetime(grouped_df[self.time_lev])
 
         if self.time_lev == "YYYYMMDD":
             grouped_df.drop(columns=["YYYYMMDD"], inplace=True)
@@ -74,21 +75,21 @@ class DataBase:
         df = self.data.drop(columns=["latitude", "longitude"]).copy(deep=True)
         unique_names = df[self.geo_lev].unique()
 
-        df_pol = pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "pm25"])
+        df_pol = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "pm25"])
         df_pol.rename(columns={"pm25": unique_names[0]}, inplace=True)
-        df_wind = pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Speed"])
+        df_wind = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Speed"])
         df_wind.rename(columns={"Wind Speed": unique_names[0]}, inplace=True)
-        df_angle = pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Angle"])
+        df_angle = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Angle"])
         df_angle.rename(columns={"Wind Angle": unique_names[0]}, inplace=True)
 
         for i in range(1, len(unique_names)):
-            df_pol = df_pol.combine_first(pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "pm25"]))
+            df_pol = df_pol.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "pm25"]))
             df_pol.rename(columns={"pm25": unique_names[i]}, inplace=True)
 
-            df_wind = df_wind.combine_first(pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Speed"]))
+            df_wind = df_wind.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Speed"]))
             df_wind.rename(columns={"Wind Speed": unique_names[i]}, inplace=True)
 
-            df_angle = df_angle.combine_first(pd.DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Angle"]))
+            df_angle = df_angle.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Angle"]))
             df_angle.rename(columns={"Wind Angle": unique_names[i]}, inplace=True)
 
         for column in df_pol:
@@ -114,10 +115,10 @@ class DataBase:
 
 
 class RunFlow:
-    def __init__(self, save: bool = False) -> None:
+    def __init__(self, save_data: bool = False) -> None:
         self.train_data = None
         self.test_data = None
-        self.save_data = save
+        self.save_data = save_data
 
     def run(self, geo_lev: str, time_lev: str) -> None:
         path_train = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
@@ -163,7 +164,7 @@ class RunFlow:
         self.train_data.wind_direction.to_csv(common_path + "/train_wind_angle.csv")
         self.train_data.wSpillovers.to_csv(common_path + "/spillover_effects_wind.csv")
         self.train_data.sSpillovers.to_csv(common_path + "/spillover_effects_space.csv")
-        np.save(common_path + "/tensor_W_train.npy", self.train_data.weight_tensor)
+        save(common_path + "/tensor_W_train.npy", self.train_data.weight_tensor)
 
         self.test_data.data.to_csv(common_path + "/Cleaned_test_data.csv")
         self.test_data.pollution.to_csv(common_path + "/test_pollution.csv")
@@ -171,11 +172,11 @@ class RunFlow:
         self.test_data.wind_direction.to_csv(common_path + "/test_wind_angle.csv")
         self.test_data.wSpillovers.to_csv(common_path + "/spillover_effects_wind.csv")
         self.test_data.sSpillovers.to_csv(common_path + "/spillover_effects_space.csv")
-        np.save(common_path + "/tensor_W_test.npy", self.test_data.weight_tensor)
+        save(common_path + "/tensor_W_test.npy", self.test_data.weight_tensor)
         return None
 
 
-def invalid_values(df: pd.DataFrame) -> pd.DataFrame:
+def invalid_values(df: DataFrame) -> DataFrame:
     output_df = df.copy()
     output_df.reset_index(inplace=True, drop=True)
     for index, row in output_df.iterrows():

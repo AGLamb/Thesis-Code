@@ -1,12 +1,12 @@
-import pandas as pd
+from pandas import DataFrame, read_csv
 
 
-def get_data(path: str) -> pd.DataFrame:
+def get_data(path: str) -> DataFrame:
     """
     :param path: filepath to the raw data
     :return: dataframe with raw data
     """
-    return pd.read_csv(path)
+    return read_csv(path)
 
 
 def main():

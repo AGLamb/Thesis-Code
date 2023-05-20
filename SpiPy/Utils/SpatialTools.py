@@ -3,8 +3,9 @@ from __future__ import annotations
 from numpy import rad2deg, ndarray, zeros, newaxis, isnan
 from geopy.distance import geodesic
 from numpy.linalg import eigvals
-from math import cos, sin, atan2
 from pandas import DataFrame
+from math import sin, atan2
+from numpy import cos
 
 
 def get_bearing(coor1: float, coor2: float) -> float:

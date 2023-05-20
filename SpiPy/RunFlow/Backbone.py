@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pandas import DataFrame, read_csv, to_datetime
 from SpiPy.Utils import SpatialTools
-from numpy import save
+from DTO.Database import HLDatabase
+from itertools import product
 
 
 class DataBase:
@@ -40,7 +41,7 @@ class DataBase:
     def format_data(self) -> None:
 
         self.data["FH"] = self.data["FH"] * 0.36
-        self.data.drop(['id', 'no2', 'pm10', 'pm10_cal', 'pm10_fac', 'pm10_max', 'pm10_min', 'pm25_cal',
+        self.data.drop(['id', 'no2', 'pm10', 'pm10_cal', 'pm10_fac', 'pm10_max', 'pm10_min', 'pm25',
                         'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
                         'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
                        axis=1, inplace=True)
@@ -75,16 +76,16 @@ class DataBase:
         df = self.data.drop(columns=["latitude", "longitude"]).copy(deep=True)
         unique_names = df[self.geo_lev].unique()
 
-        df_pol = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "pm25"])
-        df_pol.rename(columns={"pm25": unique_names[0]}, inplace=True)
+        df_pol = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "pm25_cal"])
+        df_pol.rename(columns={"pm25_cal": unique_names[0]}, inplace=True)
         df_wind = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Speed"])
         df_wind.rename(columns={"Wind Speed": unique_names[0]}, inplace=True)
         df_angle = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Angle"])
         df_angle.rename(columns={"Wind Angle": unique_names[0]}, inplace=True)
 
         for i in range(1, len(unique_names)):
-            df_pol = df_pol.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "pm25"]))
-            df_pol.rename(columns={"pm25": unique_names[i]}, inplace=True)
+            df_pol = df_pol.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "pm25_cal"]))
+            df_pol.rename(columns={"pm25_cal": unique_names[i]}, inplace=True)
 
             df_wind = df_wind.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Speed"]))
             df_wind.rename(columns={"Wind Speed": unique_names[i]}, inplace=True)
@@ -156,23 +157,35 @@ class RunFlow:
         return None
 
     def data_saver(self) -> None:
-        common_path = "/Users/main/Vault/Thesis/Data/" + self.train_data.time_lev + "/" + self.train_data.geo_lev
+        db = HLDatabase()
 
-        self.train_data.data.to_csv(common_path + "/Cleaned_train_data.csv")
-        self.train_data.pollution.to_csv(common_path + "/train_pollution.csv")
-        self.train_data.wind_speed.to_csv(common_path + "/train_wind_speed.csv")
-        self.train_data.wind_direction.to_csv(common_path + "/train_wind_angle.csv")
-        self.train_data.wSpillovers.to_csv(common_path + "/spillover_effects_wind.csv")
-        self.train_data.sSpillovers.to_csv(common_path + "/spillover_effects_space.csv")
-        save(common_path + "/tensor_W_train.npy", self.train_data.weight_tensor)
+        data = {
+            'Train': {
+                'All': self.train_data.data,
+                'Pollution': self.train_data.pollution,
+                'Wind Direction': self.train_data.wind_direction,
+                'Wind Speed': self.train_data.wind_direction,
+                'Anisotropic': self.train_data.wSpillovers,
+                'Isotroipic': self.train_data.sSpillovers,
+            },
+            'Test': {
+                'All': self.test_data.data,
+                'Pollution': self.test_data.pollution,
+                'Wind Direction': self.test_data.wind_direction,
+                'Wind Speed': self.test_data.wind_direction,
+                'Anisotropic': self.test_data.wSpillovers,
+                'Isotroipic': self.test_data.sSpillovers,
+            }
+        }
+        for combination in product(data.keys(), data['Test'].keys()):
+            # We save the train data to the Database
+            db.add_dataframe(
+                table_name=combination[0] + combination[1],
+                geo_level=self.train_data.geo_lev,
+                time_level=self.train_data.time_lev,
+                df=data[combination[0]][combination[1]]
+            )
 
-        self.test_data.data.to_csv(common_path + "/Cleaned_test_data.csv")
-        self.test_data.pollution.to_csv(common_path + "/test_pollution.csv")
-        self.test_data.wind_speed.to_csv(common_path + "/test_wind_speed.csv")
-        self.test_data.wind_direction.to_csv(common_path + "/test_wind_angle.csv")
-        self.test_data.wSpillovers.to_csv(common_path + "/spillover_effects_wind.csv")
-        self.test_data.sSpillovers.to_csv(common_path + "/spillover_effects_space.csv")
-        save(common_path + "/tensor_W_test.npy", self.test_data.weight_tensor)
         return None
 
 

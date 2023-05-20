@@ -36,6 +36,6 @@ if __name__ == "__main__":
     with warnings.catch_warnings():
         start_time = time()
         warnings.simplefilter("ignore")
-        Run()
+        Run(save_res=True)
         end_time = time()
         print("Time taken: ", end_time - start_time, "seconds")

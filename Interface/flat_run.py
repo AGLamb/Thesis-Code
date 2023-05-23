@@ -3,6 +3,9 @@ from time import time
 import warnings
 
 
+bWorkLaptop: bool = True
+
+
 class Run(object):
     def __init__(self, save_res: bool = False) -> None:
         self.save = save_res
@@ -22,7 +25,8 @@ class Run(object):
                 print(f'{value1} - {value2}')
                 self.output[value1][value2] = ThesisProcess(aggregate=value1,
                                                             intervals=value2,
-                                                            save_data=self.save)
+                                                            save_data=self.save,
+                                                            bWorkLaptop=bWorkLaptop)
                 self.output[value1][value2].run()
 
                 for key in self.output[value1][value2].results:

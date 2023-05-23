@@ -4,17 +4,24 @@ from SpiPy.RunFlow.Backbone import *
 
 
 class ThesisProcess:
-    def __init__(self, aggregate: str, intervals: str, save_data: bool = False) -> None:
-        self.results = {}
+    def __init__(
+            self, aggregate: str,
+            intervals: str,
+            save_data: bool = False,
+            bWorkLaptop: bool = False
+    ) -> None:
+
         self.aggregation_level = aggregate
         self.time_intervals = intervals
-        self.trained_set = None
-        self.performance_set = None
-        self.database = None
         self.save_data = save_data
+        self.bWorkLaptop = bWorkLaptop
+        self.performance_set = None
+        self.trained_set = None
+        self.database = None
+        self.results = {}
 
     def run(self) -> None:
-        self.database = RunFlow(save_data=self.save_data)
+        self.database = RunFlow(save_data=self.save_data, bWorkLaptop=self.bWorkLaptop)
         self.database.run(geo_lev=self.aggregation_level,
                           time_lev=self.time_intervals)
 

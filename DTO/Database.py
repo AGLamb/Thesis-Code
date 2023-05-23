@@ -4,7 +4,9 @@ import pandas as pd
 
 
 class HLDatabase:
-    def __init__(self, db_path: str = "sqlite:////Users/main/Vault/Thesis/Code/HollandseLuchten.sqlite"):
+    def __init__(self,
+                 db_path=r"sqlite:///C:\Users\VY72PC\PycharmProjects\Academia\Thesis-Code\HollandseLuchten.sqlite"
+                 ):
         self.engine = create_engine(db_path)
         self.connection = self.engine.connect()
         self.metadata = MetaData()

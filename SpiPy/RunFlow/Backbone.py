@@ -116,14 +116,19 @@ class DataBase:
 
 
 class RunFlow:
-    def __init__(self, save_data: bool = False) -> None:
+    def __init__(self, save_data: bool = False, bWorkLaptop: bool = False) -> None:
+        self.save_data = save_data
         self.train_data = None
         self.test_data = None
-        self.save_data = save_data
+        self.bWorkLaptop = bWorkLaptop
 
     def run(self, geo_lev: str, time_lev: str) -> None:
-        path_train = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-        path_test = "/Users/main/Vault/Thesis/Data/Core/test_data.csv"
+        if self.bWorkLaptop:
+            path_train = r"C:\Users\VY72PC\PycharmProjects\Academia\Data\train_data.csv"
+            path_test = r"C:\Users\VY72PC\PycharmProjects\Academia\Data\test_data.csv"
+        else:
+            path_train = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
+            path_test = r"/Users/main/Vault/Thesis/Data/Core/test_data.csv"
 
         no_sensors = ["Uithoorn", "Velsen-Zuid", "Koog aan de Zaan", "Wijk aan Zee"]
 
@@ -164,7 +169,7 @@ class RunFlow:
                 'All': self.train_data.data,
                 'Pollution': self.train_data.pollution,
                 'Wind Direction': self.train_data.wind_direction,
-                'Wind Speed': self.train_data.wind_direction,
+                'Wind Speed': self.train_data.wind_speed,
                 'Anisotropic': self.train_data.wSpillovers,
                 'Isotroipic': self.train_data.sSpillovers,
             },
@@ -172,7 +177,7 @@ class RunFlow:
                 'All': self.test_data.data,
                 'Pollution': self.test_data.pollution,
                 'Wind Direction': self.test_data.wind_direction,
-                'Wind Speed': self.test_data.wind_direction,
+                'Wind Speed': self.test_data.wind_speed,
                 'Anisotropic': self.test_data.wSpillovers,
                 'Isotroipic': self.test_data.sSpillovers,
             }

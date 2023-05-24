@@ -4,6 +4,8 @@ from pandas import DataFrame, read_csv, to_datetime
 from SpiPy.Utils import SpatialTools
 from DTO.Database import HLDatabase
 from itertools import product
+from numpy import save
+import os
 
 
 class DataBase:
@@ -27,6 +29,7 @@ class DataBase:
         self.sSpillovers = None
         self.wSpillovers = None
         self.coordinate_dict = None
+        self.Z = None
 
     def run(self) -> None:
         self.matrix_creator()
@@ -107,11 +110,12 @@ class DataBase:
     def SpatialComponents(self) -> None:
         self.coordinate_dict = SpatialTools.coordinate_dict(df=self.data, geo_level=self.geo_lev, pol=self.pollution)
         self.weight_matrix, self.angle_matrix = SpatialTools.weight_angle_matrix(self.coordinate_dict)
-        self.wSpillovers, self.sSpillovers, self.weight_tensor = SpatialTools.spatial_tensor(self.pollution,
-                                                                                             self.wind_direction,
-                                                                                             self.wind_speed,
-                                                                                             self.weight_matrix,
-                                                                                             self.angle_matrix)
+        self.wSpillovers, self.sSpillovers, \
+            self.weight_tensor, self.Z = SpatialTools.spatial_tensor(self.pollution,
+                                                                     self.wind_direction,
+                                                                     self.wind_speed,
+                                                                     self.weight_matrix,
+                                                                     self.angle_matrix)
         return None
 
 
@@ -121,6 +125,56 @@ class RunFlow:
         self.train_data = None
         self.test_data = None
         self.bWorkLaptop = bWorkLaptop
+
+    def data_saver(self) -> None:
+
+        save(r"../DTO/train_tWind",
+             self.test_data.weight_tensor)
+        save(r"../DTO/test_tWind",
+             self.test_data.weight_tensor)
+        save(r"../DTO/train_tZ",
+             self.test_data.Z)
+        save(r"../DTO/test_tZ",
+             self.test_data.Z)
+
+        mTrainMatrix = DataFrame(self.train_data.weight_matrix)
+        mTestMatrix = DataFrame(self.test_data.weight_matrix)
+        for i, _ in enumerate(self.train_data.pollution.columns):
+            mTrainMatrix.rename(columns={i: self.train_data.pollution.columns[i]}, inplace=True)
+            mTestMatrix.rename(columns={i: self.test_data.pollution.columns[i]}, inplace=True)
+
+        db = HLDatabase()
+        data = {
+            'Train-': {
+                'All': self.train_data.data,
+                'Pollution': self.train_data.pollution,
+                'Wind Direction': self.train_data.wind_direction,
+                'Wind Speed': self.train_data.wind_speed,
+                'Anisotropic': self.train_data.wSpillovers,
+                'Isotropic': self.train_data.sSpillovers,
+                'Weight Matrix': mTrainMatrix
+            },
+            'Test-': {
+                'All': self.test_data.data,
+                'Pollution': self.test_data.pollution,
+                'Wind Direction': self.test_data.wind_direction,
+                'Wind Speed': self.test_data.wind_speed,
+                'Anisotropic': self.test_data.wSpillovers,
+                'Isotropic': self.test_data.sSpillovers,
+                'Weight Matrix': mTestMatrix,
+            }
+        }
+
+        for combination in product(data.keys(), data['Test-'].keys()):
+            # We save the train data to the Database
+            db.add_dataframe(
+                table_name=combination[0] + combination[1],
+                geo_level=self.train_data.geo_lev,
+                time_level=self.train_data.time_lev,
+                df=data[combination[0]][combination[1]]
+            )
+
+        return None
 
     def run(self, geo_lev: str, time_lev: str) -> None:
         if self.bWorkLaptop:
@@ -159,38 +213,6 @@ class RunFlow:
 
         if self.save_data:
             self.data_saver()
-        return None
-
-    def data_saver(self) -> None:
-        db = HLDatabase()
-
-        data = {
-            'Train': {
-                'All': self.train_data.data,
-                'Pollution': self.train_data.pollution,
-                'Wind Direction': self.train_data.wind_direction,
-                'Wind Speed': self.train_data.wind_speed,
-                'Anisotropic': self.train_data.wSpillovers,
-                'Isotroipic': self.train_data.sSpillovers,
-            },
-            'Test': {
-                'All': self.test_data.data,
-                'Pollution': self.test_data.pollution,
-                'Wind Direction': self.test_data.wind_direction,
-                'Wind Speed': self.test_data.wind_speed,
-                'Anisotropic': self.test_data.wSpillovers,
-                'Isotroipic': self.test_data.sSpillovers,
-            }
-        }
-        for combination in product(data.keys(), data['Test'].keys()):
-            # We save the train data to the Database
-            db.add_dataframe(
-                table_name=combination[0] + combination[1],
-                geo_level=self.train_data.geo_lev,
-                time_level=self.train_data.time_lev,
-                df=data[combination[0]][combination[1]]
-            )
-
         return None
 
 

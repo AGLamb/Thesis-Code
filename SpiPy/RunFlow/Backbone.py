@@ -129,13 +129,13 @@ class RunFlow:
     def data_saver(self) -> None:
 
         save(r"../DTO/train_tWind",
-             self.test_data.weight_tensor)
+             self.train_data.weight_tensor)
         save(r"../DTO/test_tWind",
-             self.test_data.weight_tensor)
+             self.train_data.weight_tensor)
         save(r"../DTO/train_tZ",
-             self.test_data.Z)
+             self.train_data.Z)
         save(r"../DTO/test_tZ",
-             self.test_data.Z)
+             self.train_data.Z)
 
         mTrainMatrix = DataFrame(self.train_data.weight_matrix)
         mTestMatrix = DataFrame(self.test_data.weight_matrix)
@@ -166,7 +166,6 @@ class RunFlow:
         }
 
         for combination in product(data.keys(), data['Test-'].keys()):
-            # We save the train data to the Database
             db.add_dataframe(
                 table_name=combination[0] + combination[1],
                 geo_level=self.train_data.geo_lev,

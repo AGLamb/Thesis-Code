@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from numpy import rad2deg, ndarray, zeros, newaxis, isnan, minimum, maximum
+from numpy import rad2deg, ndarray, zeros, newaxis, isnan, minimum, maximum, nan_to_num
 from geopy.distance import geodesic
 from numpy.linalg import eigvals
 from pandas import DataFrame
@@ -68,13 +68,14 @@ def spatial_tensor(pol: DataFrame,
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
 
         # Change method to spectral radius normalization
-        ww_tensor[i, :, :] = ww_tensor[i, :, :] / max(eigvals(ww_tensor[i, :, :]))
         ww_tensor[i, :, :] = clip(ww_tensor[i, :, :], a_min=0, a_max=None)
+        Z[i, :, :] = minimum(ww_tensor[i, :, :], w_matrix) / maximum(ww_tensor[i, :, :], w_matrix)
+        Z[i, :, :] = nan_to_num(Z[i, :, :])
+
+        ww_tensor[i, :, :] = ww_tensor[i, :, :] / max(eigvals(ww_tensor[i, :, :]))
 
         wwy_wind[i, :] = ww_tensor[i, :, :] @ pol.iloc[i, :].T
         wwy_space[i, :] = (w_matrix / max(eigvals(w_matrix))) @ pol.iloc[i, :].to_numpy()
-
-        Z[i, :, :] = minimum(ww_tensor[i, :, :], w_matrix) / maximum(ww_tensor[i, :, :], w_matrix)
 
     wwy_wind = DataFrame(wwy_wind)
     wwy_space = DataFrame(wwy_space)

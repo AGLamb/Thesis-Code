@@ -10,7 +10,7 @@ class HLDatabase:
                  ):
 
         if db_path is None and bWorkLaptop is True:
-            self.path = r''
+            self.path = r'sqlite:///C:\Users\VY72PC\PycharmProjects\Academia\Thesis-Code\HollandseLuchten.sqlite'
         elif db_path is None and bWorkLaptop is False:
             self.path = r"sqlite:////Users/main/Vault/Thesis/Code/HollandseLuchten.sqlite"
         else:

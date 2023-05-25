@@ -5,12 +5,6 @@ import numpy as np
 
 
 def bootstrap_sample(data, B, w):
-    """
-    Bootstrap the input
-    data: input numpy data array
-    B: boostrap size
-    w: block length of the boostrap
-    """
     t = len(data)
     p = 1 / w
     indices = np.zeros((t, B), dtype=int)
@@ -28,12 +22,6 @@ def bootstrap_sample(data, B, w):
 
 
 def compute_dij(losses, bs_data):
-    """
-    :param losses: self-explanatory
-    :param bs_data:
-    :return:
-    """
-    """Compute the loss difference"""
     t, M0 = losses.shape
     B = bs_data.shape[1]
     d_ij_bar = np.zeros((M0, M0))
@@ -53,13 +41,6 @@ def compute_dij(losses, bs_data):
 
 
 def calculate_PvalR(z, included, z_data_0):
-    """
-    :param z:
-    :param included:
-    :param z_data_0:
-    :return:
-    """
-    """Calculate the p-value of relative algorithm"""
     emp_dist_TR = np.max(np.max(np.abs(z), 2), 1)
     z_data = z_data_0[ix_(included - 1, included - 1)]
     TR = np.max(z_data)
@@ -68,13 +49,6 @@ def calculate_PvalR(z, included, z_data_0):
 
 
 def calculate_PvalSQ(z, included, z_data_0):
-    """
-    :param z:
-    :param included:
-    :param z_data_0:
-    :return:
-    """
-    """Calculate the p-value of sequential algorithm"""
     emp_dist_TSQ = np.sum(z ** 2, axis=1).sum(axis=1) / 2
     z_data = z_data_0[ix_(included - 1, included - 1)]
     TSQ = np.sum(z_data ** 2) / 2
@@ -83,15 +57,6 @@ def calculate_PvalSQ(z, included, z_data_0):
 
 
 def iterate(d_ij_bar, d_ij_bar_star, var_d_ij_bar, alpha, algorithm="R"):
-    """
-    :param d_ij_bar:
-    :param d_ij_bar_star:
-    :param var_d_ij_bar:
-    :param alpha:
-    :param algorithm:
-    :return:
-    """
-    """Iteratively excluding inferior model"""
     B, M0, _ = d_ij_bar_star.shape
     z0 = (d_ij_bar_star - np.expand_dims(d_ij_bar, 0)) / np.sqrt(
         np.expand_dims(var_d_ij_bar, 0)
@@ -136,15 +101,6 @@ def iterate(d_ij_bar, d_ij_bar_star, var_d_ij_bar, alpha, algorithm="R"):
 
 
 def MCS(losses, alpha, B, w, algorithm):
-    """
-    :param losses:
-    :param alpha: alpha level for the test
-    :param B: boostrap size
-    :param w: block length of the boostrap
-    :param algorithm: algo to be used. Can  be R or SQ
-    :return:
-    """
-    """Main function of the MCS"""
     t, M0 = losses.shape
     bs_data = bootstrap_sample(np.arange(t), B, w)
     d_ij_bar, d_ij_bar_star, var_d_ij_bar = compute_dij(losses, bs_data)
@@ -156,28 +112,6 @@ def MCS(losses, alpha, B, w, algorithm):
 
 class ModelConfidenceSet(object):
     def __init__(self, data, alpha, B, w, algorithm="SQ", names=None):
-        """
-        Implementation of Econometrica Paper:
-        Hansen, Peter R., Asger Lunde, and James M. Nason.
-        "The model confidence set." Econometrica 79.2 (2011): 453-497.
-
-        Input:
-            data->pandas.DataFrame or numpy.ndarray: input data, columns are the losses of each model
-            alpha->float: confidence level
-            B->int: bootstrap size for computation covariance
-            w->int: block size for bootstrap sampling
-            algorithm->str: SQ or R, SQ is the first t-statistics in Hansen (2011)
-            p.465, and R is the second t-statistics
-            names->list: the name of each model (corresponding to each columns).
-
-        Method:
-            run(self): compute the MCS procedure
-
-        Attributes:
-            included: models that are in the model confidence sets at confidence level of alpha
-            excluded: models that are NOT in the model confidence sets at confidence level of alpha
-            values: the bootstrap p-values of each models
-        """
 
         self.pvalues = None
         self.included = None

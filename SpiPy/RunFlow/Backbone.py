@@ -5,7 +5,6 @@ from SpiPy.Utils import SpatialTools
 from DTO.Database import HLDatabase
 from itertools import product
 from numpy import save
-import os
 
 
 class DataBase:
@@ -143,7 +142,7 @@ class RunFlow:
             mTrainMatrix.rename(columns={i: self.train_data.pollution.columns[i]}, inplace=True)
             mTestMatrix.rename(columns={i: self.test_data.pollution.columns[i]}, inplace=True)
 
-        db = HLDatabase()
+        db = HLDatabase(bWorkLaptop=self.bWorkLaptop)
         data = {
             'Train-': {
                 'All': self.train_data.data,

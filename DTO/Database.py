@@ -5,9 +5,17 @@ import pandas as pd
 
 class HLDatabase:
     def __init__(self,
-                 db_path=r"sqlite:///C:\Users\VY72PC\PycharmProjects\Academia\Thesis-Code\HollandseLuchten.sqlite"
+                 db_path: str = None,
+                 bWorkLaptop: bool = False
                  ):
-        self.engine = create_engine(db_path)
+
+        if db_path is None and bWorkLaptop is True:
+            self.path = r''
+        elif db_path is None and bWorkLaptop is False:
+            self.path = r"sqlite:////Users/main/Vault/Thesis/Code/HollandseLuchten.sqlite"
+        else:
+            self.path = db_path
+        self.engine = create_engine(self.path)
         self.connection = self.engine.connect()
         self.metadata = MetaData()
         self.inspector = inspect(self.engine)

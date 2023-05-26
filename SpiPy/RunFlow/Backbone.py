@@ -1,24 +1,25 @@
 from __future__ import annotations
 
 from pandas import DataFrame, read_csv, to_datetime
+from fancyimpute import IterativeImputer
 from SpiPy.Utils import SpatialTools
 from DTO.Database import HLDatabase
 from itertools import product
+from hampel import hampel
 from numpy import save
 
 
 class DataBase:
     def __init__(self,
-                 filepath: str,
+                 df: DataFrame,
                  faulty: list,
                  geo_level: str,
                  time_interval: str) -> None:
 
-        self.data = None
-        self.path = filepath
+        self.data = df
         self.faulty_sensors = faulty
-        self.geo_lev = "name" if geo_level == "street" else "tag"
-        self.time_lev = "YYYYMMDD" if time_interval == "day" else "timestamp"
+        self.geo_lev = geo_level
+        self.time_lev = time_interval
         self.pollution = None
         self.wind_speed = None
         self.wind_direction = None
@@ -36,76 +37,54 @@ class DataBase:
         self.matrix_creator()
         return None
 
-    def get_data(self) -> None:
-        self.data = read_csv(self.path)
-        self.format_data()
-        self.group_data()
-        return None
-
-    def format_data(self) -> None:
-
-        self.data["FH"] = self.data["FH"] * 0.36
-        self.data.drop(['id', 'no2', 'pm10', 'pm10_cal', 'pm10_fac', 'pm10_max', 'pm10_min', 'pm25',
-                        'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
-                        'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
-                       axis=1, inplace=True)
-
-        for i in range(len(self.data)):
-            self.data.at[i, 'DD'] = angle_correction(self.data.at[i, 'DD'])
-
-        self.data.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
-        self.delete_entries(pop_values=self.faulty_sensors, key=self.geo_lev)
-        return None
-
-    def delete_entries(self, pop_values: set | list, key: str) -> None:
-        if len(pop_values) > 0:
-            self.data = self.data[~self.data[key].isin(pop_values)]
-        else:
-            pass
-
-    def group_data(self) -> None:
-        grouped_df = self.data.groupby(by=[self.geo_lev, self.time_lev]).median().copy().reset_index()
-        grouped_df["Date"] = to_datetime(grouped_df[self.time_lev])
-
-        if self.time_lev == "YYYYMMDD":
-            grouped_df.drop(columns=["YYYYMMDD"], inplace=True)
-        else:
-            grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
-
-        grouped_df.set_index("Date", inplace=True)
-        self.data = grouped_df
-        return None
-
     def matrix_creator(self) -> None:
-        df = self.data.drop(columns=["latitude", "longitude"]).copy(deep=True)
-        unique_names = df[self.geo_lev].unique()
+        unique_names = self.data[self.geo_lev].unique()
 
-        df_pol = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "pm25_cal"])
-        df_pol.rename(columns={"pm25_cal": unique_names[0]}, inplace=True)
-        df_wind = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Speed"])
-        df_wind.rename(columns={"Wind Speed": unique_names[0]}, inplace=True)
-        df_angle = DataFrame(df.loc[df[self.geo_lev] == unique_names[0], "Wind Angle"])
-        df_angle.rename(columns={"Wind Angle": unique_names[0]}, inplace=True)
+        self.pollution = DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[0], "pm25_cal"])
+        self.pollution.rename(columns={"pm25_cal": unique_names[0]}, inplace=True)
+        self.wind_speed = DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[0], "Wind Speed"])
+        self.wind_speed.rename(columns={"Wind Speed": unique_names[0]}, inplace=True)
+        self.wind_direction = DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[0], "Wind Angle"])
+        self.wind_direction.rename(columns={"Wind Angle": unique_names[0]}, inplace=True)
 
         for i in range(1, len(unique_names)):
-            df_pol = df_pol.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "pm25_cal"]))
-            df_pol.rename(columns={"pm25_cal": unique_names[i]}, inplace=True)
+            self.pollution = self.pollution.combine_first(
+                DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[i], "pm25_cal"])
+            )
+            self.pollution.rename(columns={"pm25_cal": unique_names[i]}, inplace=True)
 
-            df_wind = df_wind.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Speed"]))
-            df_wind.rename(columns={"Wind Speed": unique_names[i]}, inplace=True)
+            self.wind_speed = self.wind_speed.combine_first(
+                DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[i], "Wind Speed"])
+            )
+            self.wind_speed.rename(columns={"Wind Speed": unique_names[i]}, inplace=True)
 
-            df_angle = df_angle.combine_first(DataFrame(df.loc[df[self.geo_lev] == unique_names[i], "Wind Angle"]))
-            df_angle.rename(columns={"Wind Angle": unique_names[i]}, inplace=True)
+            self.wind_direction = self.wind_direction.combine_first(
+                DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[i], "Wind Angle"])
+            )
+            self.wind_direction.rename(columns={"Wind Angle": unique_names[i]}, inplace=True)
 
-        for column in df_pol:
-            median_values = (df_pol[column].median(), df_angle[column].median(), df_wind[column].median())
-            df_pol[column].fillna(value=median_values[0], inplace=True)
-            df_angle[column].fillna(value=median_values[1], inplace=True)
-            df_wind[column].fillna(value=median_values[2], inplace=True)
+        Locations = self.pollution.columns
+        imp_pol = IterativeImputer(max_iter=10, random_state=0)
+        imp_pol.fit(self.pollution.iloc[2000:])
+        self.pollution = DataFrame(imp_pol.transform(self.pollution.iloc[2000:]))
+        self.pollution.columns = Locations
 
-        self.pollution = invalid_values(df_pol)
-        self.wind_speed = invalid_values(df_wind)
-        self.wind_direction = invalid_values(df_angle)
+        imp_wind_speed = IterativeImputer(max_iter=10, random_state=0)
+        imp_wind_speed.fit(self.pollution.iloc[2000:])
+        self.wind_speed = DataFrame(imp_wind_speed.transform(self.pollution.iloc[2000:]))
+        self.wind_speed.columns = Locations
+
+        imp_wind_dir = IterativeImputer(max_iter=10, random_state=0)
+        imp_wind_dir.fit(self.pollution.iloc[2000:])
+        self.wind_direction = DataFrame(imp_wind_dir.transform(self.pollution.iloc[2000:]))
+        self.wind_direction.columns = Locations
+
+        for column in self.pollution:
+            self.pollution[column] = hampel(self.pollution[column], window_size=12, n=3, imputation=True)
+
+        self.pollution = invalid_values(self.pollution)
+        self.wind_speed = invalid_values(self.wind_speed)
+        self.wind_direction = invalid_values(self.wind_direction)
         return None
 
     def SpatialComponents(self) -> None:
@@ -120,13 +99,72 @@ class DataBase:
                                                          self.angle_matrix)
         return None
 
+    def delete_entries(self, pop_values: set | list, key: str) -> None:
+        if len(pop_values) > 0:
+            self.data = self.data[~self.data[key].isin(pop_values)]
+        else:
+            pass
+
 
 class RunFlow:
-    def __init__(self, save_data: bool = False, bWorkLaptop: bool = False) -> None:
+    def __init__(self,
+                 geo_level: str,
+                 time_interval: str,
+                 save_data: bool = False,
+                 bWorkLaptop: bool = False,
+                 ) -> None:
         self.save_data = save_data
+        self.geo_lev = "name" if geo_level == "street" else "tag"
+        self.time_lev = "YYYYMMDD" if time_interval == "day" else "timestamp"
+        self.raw_data = None
+        self.processed_data = None
         self.train_data = None
         self.test_data = None
         self.bWorkLaptop = bWorkLaptop
+
+    def get_data(self, path: str, faulty: set | list) -> None:
+        self.raw_data = read_csv(path)
+        self.format_data(faulty=faulty)
+        self.group_data()
+        self.processed_data = DataBase(df=self.raw_data,
+                                       faulty=faulty,
+                                       geo_level=self.geo_lev,
+                                       time_interval=self.time_lev)
+        self.processed_data.run()
+        return None
+
+    def format_data(self, faulty: set | list) -> None:
+        self.raw_data["FH"] *= 0.36
+        self.raw_data.drop(['id', 'no2', 'pm10', 'pm10_cal', 'pm10_fac', 'pm10_max', 'pm10_min', 'pm25',
+                            'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
+                            'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
+                           axis=1, inplace=True)
+
+        for i in range(len(self.raw_data)):
+            self.raw_data.at[i, 'DD'] = angle_correction(self.raw_data.at[i, 'DD'])
+
+        self.raw_data.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
+        self.delete_entries(pop_values=faulty, key=self.geo_lev)
+        return None
+
+    def delete_entries(self, pop_values: set | list, key: str) -> None:
+        if len(pop_values) > 0:
+            self.raw_data = self.raw_data[~self.raw_data[key].isin(pop_values)]
+        else:
+            pass
+
+    def group_data(self) -> None:
+        grouped_df = self.raw_data.groupby(by=[self.geo_lev, self.time_lev]).median().copy().reset_index()
+        grouped_df["Date"] = to_datetime(grouped_df[self.time_lev])
+
+        if self.time_lev == "YYYYMMDD":
+            grouped_df.drop(columns=["YYYYMMDD"], inplace=True)
+        else:
+            grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
+
+        grouped_df.set_index("Date", inplace=True)
+        self.raw_data = grouped_df
+        return None
 
     def data_saver(self) -> None:
 
@@ -185,27 +223,16 @@ class RunFlow:
 
         return None
 
-    def run(self, geo_lev: str, time_lev: str) -> None:
+    def run(self) -> None:
         if self.bWorkLaptop:
-            path_train = r"C:\Users\VY72PC\PycharmProjects\Academia\Data\train_data.csv"
-            path_test = r"C:\Users\VY72PC\PycharmProjects\Academia\Data\test_data.csv"
+            path = r"C:\Users\VY72PC\PycharmProjects\Academia\Data\pm25_weer.csv"
         else:
-            path_train = r"/Users/main/Vault/Thesis/Data/Core/train_data.csv"
-            path_test = r"/Users/main/Vault/Thesis/Data/Core/test_data.csv"
+            path = r"/Users/main/Vault/Thesis/Data/pm25_weer.csv"
 
         no_sensors = ["Uithoorn", "Velsen-Zuid", "Koog aan de Zaan", "Wijk aan Zee"]
 
-        self.train_data = DataBase(filepath=path_train,
-                                   faulty=no_sensors,
-                                   geo_level=geo_lev,
-                                   time_interval=time_lev)
-        self.test_data = DataBase(filepath=path_test,
-                                  faulty=no_sensors,
-                                  geo_level=geo_lev,
-                                  time_interval=time_lev)
-
-        self.train_data.get_data()
-        self.test_data.get_data()
+        self.get_data(path=path, faulty=no_sensors)
+        self.split(faulty=no_sensors)
 
         train_names = set(self.train_data.data[self.train_data.geo_lev].unique())
         test_names = set(self.test_data.data[self.test_data.geo_lev].unique())
@@ -215,14 +242,33 @@ class RunFlow:
         self.train_data.delete_entries(pop_values=misplaced, key=self.train_data.geo_lev)
         self.test_data.delete_entries(pop_values=misplaced, key=self.test_data.geo_lev)
 
-        self.train_data.run()
-        self.test_data.run()
         self.train_data.SpatialComponents()
         self.test_data.SpatialComponents()
 
         if self.save_data:
             self.data_saver()
         return None
+
+    def split(self, faulty: set | list, separation: float = 0.75) -> None:
+        cutout = int(len(self.processed_data.data) * separation)
+
+        self.train_data = DataBase(df=self.processed_data.data.iloc[:cutout, :].copy(),
+                                   faulty=faulty,
+                                   geo_level=self.geo_lev,
+                                   time_interval=self.time_lev)
+        self.train_data.pollution = self.processed_data.pollution.iloc[:cutout, :].copy()
+        self.train_data.wind_speed = self.processed_data.wind_speed.iloc[:cutout, :].copy()
+        self.train_data.wind_direction = self.processed_data.wind_direction.iloc[:cutout, :].copy()
+
+        self.test_data = DataBase(df=self.processed_data.data.iloc[cutout:, :].copy(),
+                                  faulty=faulty,
+                                  geo_level=self.geo_lev,
+                                  time_interval=self.time_lev)
+        self.test_data.pollution = self.processed_data.pollution.iloc[cutout:, :].copy()
+        self.test_data.wind_speed = self.processed_data.wind_speed.iloc[cutout:, :].copy()
+        self.test_data.wind_direction = self.processed_data.wind_direction.iloc[cutout:, :].copy()
+
+        return
 
 
 def invalid_values(df: DataFrame) -> DataFrame:

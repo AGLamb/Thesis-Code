@@ -21,9 +21,13 @@ class ThesisProcess:
         self.results = {}
 
     def run(self) -> None:
-        self.database = RunFlow(save_data=self.save_data, bWorkLaptop=self.bWorkLaptop)
-        self.database.run(geo_lev=self.aggregation_level,
-                          time_lev=self.time_intervals)
+        self.database = RunFlow(
+            save_data=self.save_data,
+            bWorkLaptop=self.bWorkLaptop,
+            geo_level=self.aggregation_level,
+            time_interval=self.time_intervals
+        )
+        self.database.run()
 
         self.trained_set = ModelSet(database=self.database)
         self.trained_set.run()

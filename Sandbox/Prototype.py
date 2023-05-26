@@ -8,7 +8,7 @@ from time import time
 
 
 def main() -> None:
-    db_manager = HLDatabase(bWorkLaptop=False)
+    db_manager = HLDatabase(bWorkLaptop=True)
     pollution = db_manager.get_table(table_name='Train-Pollution')
     pollution.set_index('Date', inplace=True, drop=True)
     mSpatial = db_manager.get_table(table_name='Train-Weight Matrix')
@@ -18,15 +18,15 @@ def main() -> None:
     tZ = load(r"../DTO/train_tX.npy")
 
     N = len(pollution.columns)
-    initial_params = [0.1, 0.2, 0.3, 0.4, 0.5, 0.4, 0.3]  # Phi
+    initial_params = [0.19, 0.23, 0.34, 0.21, 0.36, 0.41, 0.32]  # Phi
     initial_params += [0.2]  # Alpha
-    initial_params += [0.5]  # Rho
+    initial_params += [0.85]  # Rho
     initial_params += list(pollution.var().values)  # Sigma
     initial_params += [20]  # Zeta
     initial_params += [10.0]  # Beta
     initial_params += [200]  # Gamma
 
-    bounds = [(-1, 1)] * N + [(-1, 1)] + [(0, 1)] + [(1, 1000)] * N + [(0, 1)] + [(-1000, 1000)] * 2
+    bounds = [(-0.9, 0.9)] * N + [(-1, 1)] + [(0, 1)] + [(1, 1000)] * N + [(0, 1)] + [(-1000, 1000)] * 2
 
     tZ_1 = tZ[8000:10000, :, :]
     pollution_1 = pollution.values[8000:10000, :]

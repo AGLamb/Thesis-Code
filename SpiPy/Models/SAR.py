@@ -21,8 +21,8 @@ class QMLEOptimizer:
         self.M = wind_tensor.shape[0]
         self.N = wind_tensor.shape[1]
 
-        assert len(initial_params) == 2 * self.N + 5, "initial_params must be of size 2N + 5"
-        assert len(bounds) == 2 * self.N + 5, "bounds must be of size 2N + 5"
+        assert len(initial_params) == 2 * self.N + 4, "initial_params must be of size 2N + 5"
+        assert len(bounds) == 2 * self.N + 4, "bounds must be of size 2N + 5"
 
         self.initial_params = initial_params
         self.mW_0 = weight_matrix.values
@@ -40,21 +40,23 @@ class QMLEOptimizer:
         phi = zeros((self.N, self.N))
         fill_diagonal(phi, params[:self.N])
 
-        alpha = params[self.N]
-        rho = params[self.N + 1]
+        # alpha = params[-5]
+        rho = params[-4]
         zeta = params[-3]
         beta = params[-2]
         gamma = params[-1]
 
         Sigma = zeros((self.N, self.N))
-        fill_diagonal(Sigma, params[self.N + 2:-3])
+        fill_diagonal(Sigma, params[self.N:-4])
         det_Sigma = -0.5 * log(det(Sigma)) * self.M
 
         log_likelihood = 0.0
         for t in range(1, self.M):
-            A_t_minus_1 = phi+alpha*rho*self.mW_0
+            A_t_minus_1 = phi+rho
             A_t_minus_1 += \
-                alpha*(1-rho)*(1/(1+exp(-zeta*(self.mZ_t[t-1, :, :]-beta-gamma*self.mZ_t[t, :, :]))))*self.mW_1[t, :, :]
+                (1-rho)*(1/(1+exp(-zeta*(
+                        self.mZ_t[t-1, :, :]-beta-gamma*self.mZ_t[t-1, :, :]
+                ))))*self.mW_1[t-1, :, :]
 
             _, s_A, _ = svd(A_t_minus_1)
             det_A = log(prod(s_A))

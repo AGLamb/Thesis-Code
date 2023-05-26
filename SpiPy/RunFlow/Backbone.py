@@ -241,7 +241,8 @@ class RunFlow:
         return None
 
     def split(self, faulty: set | list, separation: float = 0.75) -> None:
-        cutout = int(len(self.processed_data.data) * separation)
+        cutout = int(len(self.processed_data.pollution) * separation)
+        print(cutout)
 
         self.train_data = DataBase(df=self.processed_data.data.copy(),
                                    faulty=faulty,

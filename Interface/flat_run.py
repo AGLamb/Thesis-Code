@@ -3,7 +3,8 @@ from time import time
 import warnings
 
 
-bWorkLaptop: bool = True
+bWorkLaptop: bool = False
+save_to_disk: bool = False
 
 
 class Run(object):
@@ -40,6 +41,6 @@ if __name__ == "__main__":
     with warnings.catch_warnings():
         start_time = time()
         warnings.simplefilter("ignore")
-        Run(save_res=True)
+        Run(save_res=save_to_disk)
         end_time = time()
         print("Time taken: ", end_time - start_time, "seconds")

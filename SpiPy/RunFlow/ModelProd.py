@@ -63,7 +63,7 @@ class ModelSet:
 
 class ForecastSet:
     def __init__(self, time_lev) -> None:
-        self.forecast_steps = 365 if time_lev == "day" else (365 * 24)
+        self.forecast_steps = 100 if time_lev == "day" else (100 * 24)
         self.performance = {"MAPE": {}, "MSE": {}, "RMSE": {}, "MAE": {}, "SMAPE": {}}
         self.metric_func = [MAPE, MSE, RMSE, MAE, SMAPE]
 

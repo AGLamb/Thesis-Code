@@ -10,9 +10,9 @@ from time import time
 def main() -> None:
     db_manager = HLDatabase(bWorkLaptop=True)
     pollution = db_manager.get_table(table_name='Train-Pollution')
-    pollution.set_index('Date', inplace=True, drop=True)
+    pollution.drop(labels='index', axis=1, inplace=True)
     mSpatial = db_manager.get_table(table_name='Train-Weight Matrix')
-    mSpatial = mSpatial.drop(labels='index', axis=1)
+    mSpatial.drop(labels='index', axis=1, inplace=True)
 
     tWind = load(r"../DTO/train_tWind.npy")
     tZ = load(r"../DTO/train_tX.npy")

@@ -63,21 +63,20 @@ class DataBase:
             )
             self.wind_direction.rename(columns={"Wind Angle": unique_names[i]}, inplace=True)
 
-        Locations = self.pollution.columns
         imp_pol = IterativeImputer(max_iter=10, random_state=0)
         imp_pol.fit(self.pollution.iloc[2000:])
         self.pollution = DataFrame(imp_pol.transform(self.pollution.iloc[2000:]))
-        self.pollution.columns = Locations
+        self.pollution.columns = unique_names
 
         imp_wind_speed = IterativeImputer(max_iter=10, random_state=0)
-        imp_wind_speed.fit(self.pollution.iloc[2000:])
-        self.wind_speed = DataFrame(imp_wind_speed.transform(self.pollution.iloc[2000:]))
-        self.wind_speed.columns = Locations
+        imp_wind_speed.fit(self.wind_speed.iloc[2000:])
+        self.wind_speed = DataFrame(imp_wind_speed.transform(self.wind_speed.iloc[2000:]))
+        self.wind_speed.columns = unique_names
 
         imp_wind_dir = IterativeImputer(max_iter=10, random_state=0)
-        imp_wind_dir.fit(self.pollution.iloc[2000:])
-        self.wind_direction = DataFrame(imp_wind_dir.transform(self.pollution.iloc[2000:]))
-        self.wind_direction.columns = Locations
+        imp_wind_dir.fit(self.wind_direction.iloc[2000:])
+        self.wind_direction = DataFrame(imp_wind_dir.transform(self.wind_direction.iloc[2000:]))
+        self.wind_direction.columns = unique_names
 
         for column in self.pollution:
             self.pollution[column] = hampel(self.pollution[column], window_size=12, n=3, imputation=True)
@@ -92,11 +91,11 @@ class DataBase:
         self.weight_matrix, self.angle_matrix = SpatialTools.weight_angle_matrix(self.coordinate_dict)
         self.wSpillovers, self.sSpillovers, \
             self.weight_tensor, self.Z, \
-            self.X, self.Y = SpatialTools.spatial_tensor(self.pollution,
-                                                         self.wind_direction,
-                                                         self.wind_speed,
-                                                         self.weight_matrix,
-                                                         self.angle_matrix)
+            self.X, self.Y = SpatialTools.spatial_tensor(pol=self.pollution,
+                                                         angle=self.wind_direction,
+                                                         wind=self.wind_speed,
+                                                         w_matrix=self.weight_matrix,
+                                                         angle_matrix=self.angle_matrix)
         return None
 
     def delete_entries(self, pop_values: set | list, key: str) -> None:
@@ -144,10 +143,10 @@ class RunFlow:
             self.raw_data.at[i, 'DD'] = angle_correction(self.raw_data.at[i, 'DD'])
 
         self.raw_data.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
-        self.delete_entries(pop_values=faulty, key=self.geo_lev)
+        self.delete_entries_raw(pop_values=faulty, key=self.geo_lev)
         return None
 
-    def delete_entries(self, pop_values: set | list, key: str) -> None:
+    def delete_entries_raw(self, pop_values: set | list, key: str) -> None:
         if len(pop_values) > 0:
             self.raw_data = self.raw_data[~self.raw_data[key].isin(pop_values)]
         else:
@@ -234,14 +233,6 @@ class RunFlow:
         self.get_data(path=path, faulty=no_sensors)
         self.split(faulty=no_sensors)
 
-        train_names = set(self.train_data.data[self.train_data.geo_lev].unique())
-        test_names = set(self.test_data.data[self.test_data.geo_lev].unique())
-
-        misplaced = (train_names - test_names) | (test_names - train_names)
-
-        self.train_data.delete_entries(pop_values=misplaced, key=self.train_data.geo_lev)
-        self.test_data.delete_entries(pop_values=misplaced, key=self.test_data.geo_lev)
-
         self.train_data.SpatialComponents()
         self.test_data.SpatialComponents()
 
@@ -252,7 +243,7 @@ class RunFlow:
     def split(self, faulty: set | list, separation: float = 0.75) -> None:
         cutout = int(len(self.processed_data.data) * separation)
 
-        self.train_data = DataBase(df=self.processed_data.data.iloc[:cutout, :].copy(),
+        self.train_data = DataBase(df=self.processed_data.data.copy(),
                                    faulty=faulty,
                                    geo_level=self.geo_lev,
                                    time_interval=self.time_lev)
@@ -260,7 +251,7 @@ class RunFlow:
         self.train_data.wind_speed = self.processed_data.wind_speed.iloc[:cutout, :].copy()
         self.train_data.wind_direction = self.processed_data.wind_direction.iloc[:cutout, :].copy()
 
-        self.test_data = DataBase(df=self.processed_data.data.iloc[cutout:, :].copy(),
+        self.test_data = DataBase(df=self.processed_data.data.copy(),
                                   faulty=faulty,
                                   geo_level=self.geo_lev,
                                   time_interval=self.time_lev)
@@ -268,7 +259,19 @@ class RunFlow:
         self.test_data.wind_speed = self.processed_data.wind_speed.iloc[cutout:, :].copy()
         self.test_data.wind_direction = self.processed_data.wind_direction.iloc[cutout:, :].copy()
 
-        return
+        self.delete_entries()
+        return None
+
+    def delete_entries(self) -> None:
+        train_names = set(self.train_data.data[self.train_data.geo_lev].unique())
+        test_names = set(self.test_data.data[self.test_data.geo_lev].unique())
+
+        misplaced_train = train_names - (test_names & train_names)
+        misplaced_test = test_names - (test_names & train_names)
+
+        self.train_data.pollution.drop(columns=misplaced_train, inplace=True)
+        self.test_data.pollution.drop(columns=misplaced_test, inplace=True)
+        return None
 
 
 def invalid_values(df: DataFrame) -> DataFrame:

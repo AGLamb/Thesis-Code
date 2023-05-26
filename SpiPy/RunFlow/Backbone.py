@@ -29,6 +29,8 @@ class DataBase:
         self.wSpillovers = None
         self.coordinate_dict = None
         self.Z = None
+        self.X = None
+        self.Y = None
 
     def run(self) -> None:
         self.matrix_creator()
@@ -110,11 +112,12 @@ class DataBase:
         self.coordinate_dict = SpatialTools.coordinate_dict(df=self.data, geo_level=self.geo_lev, pol=self.pollution)
         self.weight_matrix, self.angle_matrix = SpatialTools.weight_angle_matrix(self.coordinate_dict)
         self.wSpillovers, self.sSpillovers, \
-            self.weight_tensor, self.Z = SpatialTools.spatial_tensor(self.pollution,
-                                                                     self.wind_direction,
-                                                                     self.wind_speed,
-                                                                     self.weight_matrix,
-                                                                     self.angle_matrix)
+            self.weight_tensor, self.Z, \
+            self.X, self.Y = SpatialTools.spatial_tensor(self.pollution,
+                                                         self.wind_direction,
+                                                         self.wind_speed,
+                                                         self.weight_matrix,
+                                                         self.angle_matrix)
         return None
 
 
@@ -130,11 +133,19 @@ class RunFlow:
         save(r"../DTO/train_tWind",
              self.train_data.weight_tensor)
         save(r"../DTO/test_tWind",
-             self.train_data.weight_tensor)
+             self.test_data.weight_tensor)
         save(r"../DTO/train_tZ",
              self.train_data.Z)
         save(r"../DTO/test_tZ",
-             self.train_data.Z)
+             self.test_data.Z)
+        save(r"../DTO/train_tX",
+             self.train_data.X)
+        save(r"../DTO/test_tX",
+             self.test_data.Y)
+        save(r"../DTO/train_tY",
+             self.train_data.Y)
+        save(r"../DTO/test_tY",
+             self.test_data.Y)
 
         mTrainMatrix = DataFrame(self.train_data.weight_matrix)
         mTestMatrix = DataFrame(self.test_data.weight_matrix)

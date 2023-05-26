@@ -1,55 +1,65 @@
-from numpy import load, linspace
 from SpiPy.Models.SAR import *
 from DTO.Database import *
+from numpy import load
 from time import time
-import warnings
+
+
+# import warnings
 
 
 def main() -> None:
-    db_manager = HLDatabase(bWorkLaptop=True)
+    db_manager = HLDatabase(bWorkLaptop=False)
     pollution = db_manager.get_table(table_name='Train-Pollution')
     pollution.set_index('Date', inplace=True, drop=True)
     mSpatial = db_manager.get_table(table_name='Train-Weight Matrix')
     mSpatial = mSpatial.drop(labels='index', axis=1)
 
     tWind = load(r"../DTO/train_tWind.npy")
-    tZ = load(r"../DTO/train_tZ.npy")
+    tZ = load(r"../DTO/train_tX.npy")
 
     N = len(pollution.columns)
-    initial_params = [0.5]*N + [0.2] + [0.5] + list(pollution.var().values)
-    bounds = [(-1, 1)]*N + [(-1, 1)] + [(0, 1)] + [(1, 1000)]*N
-    zeta_values = linspace(0, 1, 11)
+    initial_params = [0.1, 0.2, 0.3, 0.4, 0.5, 0.4, 0.3]  # Phi
+    initial_params += [0.2]  # Alpha
+    initial_params += [0.5]  # Rho
+    initial_params += list(pollution.var().values)  # Sigma
+    initial_params += [20]  # Zeta
+    initial_params += [10.0]  # Beta
+    initial_params += [200]  # Gamma
 
-    tZ_1 = tZ[8000:9000, :, :]
-    pollution_1 = pollution.values[8000:9000, :]
-    tWind_1 = tWind[8000:9000, :, :]
+    bounds = [(-1, 1)] * N + [(-1, 1)] + [(0, 1)] + [(1, 1000)] * N + [(0, 1)] + [(-1000, 1000)] * 2
 
-    optimizer = QMLEOptimizerWithZetaGridSearch(
+    tZ_1 = tZ[8000:10000, :, :]
+    pollution_1 = pollution.values[8000:10000, :]
+    tWind_1 = tWind[8000:10000, :, :]
+
+    optimizer = QMLEOptimizer(
         initial_params=initial_params,
         bounds=bounds,
-        zeta_values=zeta_values,
         weight_matrix=mSpatial,
         wind_tensor=tWind_1,
         exog=pollution_1,
-        Z=tZ_1
+        Z=tZ_1,
+        method='Normal'
     )
 
     optimizer.fit()
     best_params = optimizer.get_best_params()
 
     print("Best Parameters:")
-    print("alpha:", best_params[N])
-    print("rho:", best_params[N+1])
-    print("zeta:", best_params[-1])
-    print("phi:", best_params[:N])
-    print("Sigma:", best_params[N+2:-1])
+    print("Phi:", best_params[:N])
+    print("Alpha:", best_params[N])
+    print("Rho:", best_params[N + 1])
+    print("Zeta:", best_params[-3])
+    print("Beta:", best_params[-2])
+    print("Gamma:", best_params[-1])
+    print("Sigma:", best_params[N + 2:-3])
     return None
 
 
 if __name__ == "__main__":
-    with warnings.catch_warnings():
-        start_time = time()
-        warnings.simplefilter("ignore")
-        main()
-        end_time = time()
-        print("Time taken: ", end_time - start_time, "seconds")
+    # with warnings.catch_warnings():
+    start_time = time()
+    # warnings.simplefilter("ignore")
+    main()
+    end_time = time()
+    print("Time taken: ", end_time - start_time, "seconds")

@@ -1,95 +1,155 @@
-from numpy import inf, exp, dot, zeros, fill_diagonal, log
-from numpy.linalg import inv, det
-from scipy.optimize import minimize
+from scipy.optimize import minimize, differential_evolution, basinhopping, dual_annealing
+from numpy import inf, exp, dot, zeros, fill_diagonal, log, prod
+from pyswarms.single import GlobalBestPSO
+from numpy.linalg import pinv, det, svd
 from pandas import DataFrame
 from numpy import ndarray
-from tqdm import tqdm
 
 
-class QMLEOptimizerWithZetaGridSearch:
+class QMLEOptimizer:
     def __init__(
             self,
             initial_params,
-            bounds: list,  # Expected size is 3N + 1, without zeta
-            zeta_values: ndarray,
+            bounds: list,
             weight_matrix: DataFrame,
             wind_tensor: ndarray,
             exog: ndarray,
-            Z: ndarray
+            Z: ndarray,
+            method: str = 'DE'
     ) -> None:
 
-        N = wind_tensor.shape[1]  # Assuming N is the number of columns in weight_matrix
-        assert len(initial_params) == 2 * N + 2, "initial_params must be of size 2N + 1"
-        assert len(bounds) == 2 * N + 2, "bounds must be of size 2N + 1"
+        self.M = wind_tensor.shape[0]
+        self.N = wind_tensor.shape[1]
+
+        assert len(initial_params) == 2 * self.N + 5, "initial_params must be of size 2N + 5"
+        assert len(bounds) == 2 * self.N + 5, "bounds must be of size 2N + 5"
 
         self.initial_params = initial_params
         self.mW_0 = weight_matrix.values
-        self.zeta_values = zeta_values
         self.mW_1 = wind_tensor
-        self.mY_t = exog
         self.bounds = bounds
-        self.min_nll = inf
-        self.mZ_t = Z * 100
+        self.mZ_t = Z
+        self.type = method
+        self.min_nll = 1000000
+        self.mY_t = exog
 
         self.best_params = None
 
     def likelihood_function(self, params: list):
-        M = self.mW_1.shape[0]
-        N = self.mW_0.shape[1]
 
-        phi = zeros((N, N))
-        fill_diagonal(phi, params[:N])
+        phi = zeros((self.N, self.N))
+        fill_diagonal(phi, params[:self.N])
 
-        alpha = params[N]
-        rho = params[N + 1]
-        zeta = params[-1]
+        alpha = params[self.N]
+        rho = params[self.N + 1]
+        zeta = params[-3]
+        beta = params[-2]
+        gamma = params[-1]
 
-        Sigma = zeros((N, N))
-        fill_diagonal(Sigma, params[N + 2:-1])
-        det_Sigma = -0.5 * log(det(Sigma)) * M
+        Sigma = zeros((self.N, self.N))
+        fill_diagonal(Sigma, params[self.N + 2:-3])
+        det_Sigma = -0.5 * log(det(Sigma)) * self.M
 
         log_likelihood = 0.0
-        for t in range(1, M):
+        for t in range(1, self.M):
             A_t_minus_1 = phi+alpha*rho*self.mW_0
             A_t_minus_1 += \
-                alpha*(1-rho)*(1/(1+exp(-zeta*(self.mZ_t[t-1, :, :]-1))))*self.mW_1[t, :, :]
+                alpha*(1-rho)*(1/(1+exp(-zeta*(self.mZ_t[t-1, :, :]-beta-gamma*self.mZ_t[t, :, :]))))*self.mW_1[t, :, :]
+
+            _, s_A, _ = svd(A_t_minus_1)
+            det_A = log(prod(s_A))
 
             residual_t = self.mY_t[t, :] - dot(A_t_minus_1, self.mY_t[t - 1, :])
 
-            log_likelihood += \
-                log(det(A_t_minus_1))-0.5*dot(residual_t.T, dot(inv(Sigma), residual_t))
+            log_likelihood += det_A
+            log_likelihood -= 0.5*dot(residual_t.T, dot(pinv(Sigma), residual_t))
 
         return log_likelihood + det_Sigma
 
     def neg_log_likelihood(self, params: list):
         return -self.likelihood_function(params=params)
 
-    def fit_with_zeta(self, zeta):
-        params_with_zeta = self.initial_params + [zeta]
-        bounds_with_zeta = self.bounds + [(0, 1)]
+    def fit(self) -> None:
+        if self.type == "Normal":
+            self.Normal()
+        elif self.type == "DE":
+            self.DifferentialEvolution()
+        elif self.type == "SA":
+            self.SimulatedAnnealing()
+        elif self.type == "PSO":
+            self.ParticleSwarmOptimization()
+        elif self.type == "BH":
+            self.BasinHopping()
+        else:
+            raise ValueError(f"Unknown method: {self.type}")
+        return None
+
+    def get_best_params(self) -> ndarray:
+        return self.best_params
+
+    def Normal(self):
 
         result = minimize(
             fun=self.neg_log_likelihood,
-            x0=params_with_zeta,
-            bounds=bounds_with_zeta,
+            x0=self.initial_params,
+            bounds=self.bounds,
         )
 
-        return result.fun, result.x
+        if result.fun < self.min_nll:
+            self.min_nll = result.fun
+            self.best_params = result.x
 
-    def fit(self):
-        for zeta in tqdm(self.zeta_values, desc='Optimizing: '):
-            initial_params_with_zeta = self.initial_params + [zeta]
-            bounds_with_zeta = self.bounds + [(0, 1)]
+        return None
 
-            result = minimize(
-                fun=self.neg_log_likelihood,
-                x0=initial_params_with_zeta,
-                bounds=bounds_with_zeta,
-            )
+    def SimulatedAnnealing(self):
 
-            if result.fun < self.min_nll:
-                self.min_nll = result.fun
-                self.best_params = result.x
+        result = dual_annealing(
+            func=self.neg_log_likelihood,
+            bounds=self.bounds,
+        )
 
-    def get_best_params(self):
-        return self.best_params
+        self.min_nll = result.fun
+        self.best_params = result.x
+        return
+
+    def ParticleSwarmOptimization(self):
+        # Define the bounds in the form expected by pyswarms
+        max_bounds = [bound[1] for bound in self.bounds]
+        min_bounds = [bound[0] for bound in self.bounds]
+        bounds = (min_bounds, max_bounds)
+
+        # Initialize swarm
+        options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+        optimizer = GlobalBestPSO(n_particles=10, dimensions=len(self.bounds), options=options, bounds=bounds)
+
+        # Perform optimization
+        cost, pos = optimizer.optimize(self.neg_log_likelihood, iters=1000)
+
+        self.min_nll = cost
+        self.best_params = pos
+        return
+
+    def DifferentialEvolution(self):
+
+        result = differential_evolution(
+            func=self.neg_log_likelihood,
+            bounds=self.bounds,
+            disp=True
+        )
+
+        self.min_nll = result.fun
+        self.best_params = result.x
+        return
+
+    def BasinHopping(self):
+
+        result = basinhopping(
+            func=self.neg_log_likelihood,
+            x0=self.initial_params,
+            minimizer_kwargs={'bounds': self.bounds},
+            disp=True,
+        )
+
+        self.min_nll = result.fun
+        self.best_params = result.x
+        return

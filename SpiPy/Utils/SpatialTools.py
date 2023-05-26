@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from numpy import rad2deg, ndarray, zeros, newaxis, isnan, minimum, maximum, nan_to_num
+from numpy import rad2deg, ndarray, zeros, newaxis, isnan, minimum, maximum, nan_to_num, abs, reciprocal
 from geopy.distance import geodesic
 from numpy.linalg import eigvals
 from pandas import DataFrame
@@ -48,13 +48,15 @@ def spatial_tensor(pol: DataFrame,
                    wind: DataFrame,
                    w_matrix: ndarray,
                    angle_matrix: ndarray
-                   ) -> tuple[DataFrame, DataFrame, ndarray, ndarray]:
+                   ) -> tuple[DataFrame, DataFrame, ndarray, ndarray, ndarray, ndarray]:
 
     t = len(angle)
     n = len(angle.columns)
 
     ww_tensor = zeros((t, n, n))
     Z = zeros((t, n, n))
+    W = zeros((t, n, n))
+    X = zeros((t, n, n))
     wwy_wind = zeros((t, n))
     wwy_space = zeros((t, n))
 
@@ -65,12 +67,16 @@ def spatial_tensor(pol: DataFrame,
         # This function is from the module math, so it might now work; substitute to numpy then
         ww_tensor[i, :, :] = cos(angle_matrix - time_angle[newaxis, :])
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * time_speed[newaxis, :]
+        W[i, :, :] = ww_tensor[i, :, :]
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
+        X[i, :, :] = ww_tensor[i, :, :]
 
         # Change method to spectral radius normalization
+        Z[i, :, :] = minimum(abs(ww_tensor[i, :, :]),
+                             abs(w_matrix)) / maximum(abs(ww_tensor[i, :, :]),
+                                                      abs(reciprocal(w_matrix)))
+        Z[i, :, :] = nan_to_num(Z[i, :, :]) * 100 + 1
         ww_tensor[i, :, :] = clip(ww_tensor[i, :, :], a_min=0, a_max=None)
-        Z[i, :, :] = minimum(ww_tensor[i, :, :], w_matrix) / maximum(ww_tensor[i, :, :], w_matrix)
-        Z[i, :, :] = nan_to_num(Z[i, :, :])
 
         ww_tensor[i, :, :] = ww_tensor[i, :, :] / max(eigvals(ww_tensor[i, :, :]))
 
@@ -85,7 +91,7 @@ def spatial_tensor(pol: DataFrame,
 
     wwy_wind.set_index(pol.index, inplace=True)
     wwy_space.set_index(pol.index, inplace=True)
-    return wwy_wind, wwy_space, ww_tensor, Z
+    return wwy_wind, wwy_space, ww_tensor, Z, W, X
 
 
 def has_nan(matrix):

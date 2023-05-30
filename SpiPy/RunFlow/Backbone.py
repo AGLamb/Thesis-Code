@@ -25,15 +25,19 @@ class DataBase:
         self.wind_direction = None
         self.weight_matrix = None
         self.angle_matrix = None
+        self.coordinate_dict = None
         self.weight_tensor = None
         self.sSpillovers = None
         self.wSpillovers = None
-        self.coordinate_dict = None
-        self.Z = None
         self.X = None
         self.Y = None
 
     def run(self) -> None:
+        self.coordinate_dict = SpatialTools.coordinate_dict(
+            df=self.data,
+            geo_level=self.geo_lev
+        )
+        self.weight_matrix, self.angle_matrix = SpatialTools.weight_angle_matrix(self.coordinate_dict)
         self.matrix_creator()
         return None
 
@@ -63,23 +67,31 @@ class DataBase:
             )
             self.wind_direction.rename(columns={"Wind Angle": unique_names[i]}, inplace=True)
 
+        self.pollution.columns = unique_names
+        self.wind_speed.columns = unique_names
+        self.wind_direction.columns = unique_names
+
+        indices = self.pollution.index[2000:]
+
         imp_pol = IterativeImputer(max_iter=10, random_state=0)
         imp_pol.fit(self.pollution.iloc[2000:])
         self.pollution = DataFrame(imp_pol.transform(self.pollution.iloc[2000:]))
-        self.pollution.columns = unique_names
+        self.pollution.index = indices
 
+        self.wind_speed.drop(labels=unique_names[1:], axis=1, inplace=True)
         imp_wind_speed = IterativeImputer(max_iter=10, random_state=0)
         imp_wind_speed.fit(self.wind_speed.iloc[2000:])
         self.wind_speed = DataFrame(imp_wind_speed.transform(self.wind_speed.iloc[2000:]))
-        self.wind_speed.columns = unique_names
+        self.wind_speed.index = indices
 
+        self.wind_direction.drop(labels=unique_names[1:], axis=1, inplace=True)
         imp_wind_dir = IterativeImputer(max_iter=10, random_state=0)
         imp_wind_dir.fit(self.wind_direction.iloc[2000:])
         self.wind_direction = DataFrame(imp_wind_dir.transform(self.wind_direction.iloc[2000:]))
-        self.wind_direction.columns = unique_names
+        self.wind_direction.index = indices
 
         for column in self.pollution:
-            self.pollution[column] = hampel(self.pollution[column], window_size=12, n=3, imputation=True)
+            self.pollution[column] = hampel(self.pollution[column], window_size=84, n=3, imputation=True)
 
         self.pollution = invalid_values(self.pollution)
         self.wind_speed = invalid_values(self.wind_speed)
@@ -87,10 +99,8 @@ class DataBase:
         return None
 
     def SpatialComponents(self) -> None:
-        self.coordinate_dict = SpatialTools.coordinate_dict(df=self.data, geo_level=self.geo_lev, pol=self.pollution)
-        self.weight_matrix, self.angle_matrix = SpatialTools.weight_angle_matrix(self.coordinate_dict)
         self.wSpillovers, self.sSpillovers, \
-            self.weight_tensor, self.Z, \
+            self.weight_tensor, \
             self.X, self.Y = SpatialTools.spatial_tensor(pol=self.pollution,
                                                          angle=self.wind_direction,
                                                          wind=self.wind_speed,
@@ -171,10 +181,6 @@ class RunFlow:
              self.train_data.weight_tensor)
         save(r"../DTO/test_tWind",
              self.test_data.weight_tensor)
-        save(r"../DTO/train_tZ",
-             self.train_data.Z)
-        save(r"../DTO/test_tZ",
-             self.test_data.Z)
         save(r"../DTO/train_tX",
              self.train_data.X)
         save(r"../DTO/test_tX",
@@ -231,10 +237,8 @@ class RunFlow:
         no_sensors = ["Uithoorn", "Velsen-Zuid", "Koog aan de Zaan", "Wijk aan Zee"]
 
         self.get_data(path=path, faulty=no_sensors)
+        self.processed_data.SpatialComponents()
         self.split(faulty=no_sensors)
-
-        self.train_data.SpatialComponents()
-        self.test_data.SpatialComponents()
 
         if self.save_data:
             self.data_saver()
@@ -242,23 +246,38 @@ class RunFlow:
 
     def split(self, faulty: set | list, separation: float = 0.75) -> None:
         cutout = int(len(self.processed_data.pollution) * separation)
-        print(cutout)
 
-        self.train_data = DataBase(df=self.processed_data.data.copy(),
+        self.train_data = DataBase(df=self.processed_data.data,
                                    faulty=faulty,
                                    geo_level=self.geo_lev,
                                    time_interval=self.time_lev)
-        self.train_data.pollution = self.processed_data.pollution.iloc[:cutout, :].copy()
-        self.train_data.wind_speed = self.processed_data.wind_speed.iloc[:cutout, :].copy()
         self.train_data.wind_direction = self.processed_data.wind_direction.iloc[:cutout, :].copy()
+        self.train_data.wind_speed = self.processed_data.wind_speed.iloc[:cutout, :].copy()
+        self.train_data.pollution = self.processed_data.pollution.iloc[:cutout, :].copy()
+        self.train_data.coordinate_dict = self.processed_data.coordinate_dict
+        self.train_data.weight_matrix = self.processed_data.weight_matrix
+        self.train_data.angle_matrix = self.processed_data.angle_matrix
+        self.train_data.weight_tensor = self.processed_data.weight_tensor[:cutout, :, :]
+        self.train_data.sSpillovers = self.processed_data.sSpillovers.iloc[:cutout, :]
+        self.train_data.wSpillovers = self.processed_data.wSpillovers.iloc[:cutout, :]
+        self.train_data.X = self.processed_data.X[:cutout, :, :]
+        self.train_data.Y = self.processed_data.Y[:cutout, :, :]
 
-        self.test_data = DataBase(df=self.processed_data.data.copy(),
+        self.test_data = DataBase(df=self.processed_data.data,
                                   faulty=faulty,
                                   geo_level=self.geo_lev,
                                   time_interval=self.time_lev)
-        self.test_data.pollution = self.processed_data.pollution.iloc[cutout:, :].copy()
-        self.test_data.wind_speed = self.processed_data.wind_speed.iloc[cutout:, :].copy()
         self.test_data.wind_direction = self.processed_data.wind_direction.iloc[cutout:, :].copy()
+        self.test_data.wind_speed = self.processed_data.wind_speed.iloc[cutout:, :].copy()
+        self.test_data.pollution = self.processed_data.pollution.iloc[cutout:, :].copy()
+        self.test_data.coordinate_dict = self.processed_data.coordinate_dict
+        self.test_data.weight_matrix = self.processed_data.weight_matrix
+        self.test_data.angle_matrix = self.processed_data.angle_matrix
+        self.test_data.weight_tensor = self.processed_data.weight_tensor[cutout:, :, :]
+        self.test_data.sSpillovers = self.processed_data.sSpillovers.iloc[cutout:, :]
+        self.test_data.wSpillovers = self.processed_data.wSpillovers.iloc[cutout:, :]
+        self.test_data.X = self.processed_data.X[cutout:, :, :]
+        self.test_data.Y = self.processed_data.Y[cutout:, :, :]
 
         self.delete_entries()
         return None

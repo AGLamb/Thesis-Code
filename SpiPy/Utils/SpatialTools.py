@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from numpy import rad2deg, ndarray, zeros, newaxis, isnan, minimum, maximum, nan_to_num, abs, reciprocal
+from numpy import rad2deg, ndarray, zeros, newaxis
 from geopy.distance import geodesic
 from numpy.linalg import eigvals
 from pandas import DataFrame
@@ -8,7 +8,7 @@ from math import sin, atan2
 from numpy import cos, clip
 
 
-def get_bearing(coor1: float, coor2: float) -> float:
+def get_bearing(coor1: list, coor2: list) -> float:
     d_lon = (coor2[1] - coor1[1])
     y = sin(d_lon) * cos(coor2[0])
     x = cos(coor1[0]) * sin(coor2[0]) - sin(coor1[0]) * cos(coor2[0]) * cos(d_lon)
@@ -17,8 +17,8 @@ def get_bearing(coor1: float, coor2: float) -> float:
     return brng
 
 
-def coordinate_dict(df: DataFrame, geo_level: str, pol: DataFrame):
-    locations = list(pol.columns)
+def coordinate_dict(df: DataFrame, geo_level: str):
+    locations = list(df[geo_level].unique())
     c_dict = dict()
     for item in locations:
         c_dict[item] = [df.loc[df[geo_level] == item, 'latitude'].mean(),
@@ -48,36 +48,26 @@ def spatial_tensor(pol: DataFrame,
                    wind: DataFrame,
                    w_matrix: ndarray,
                    angle_matrix: ndarray
-                   ) -> tuple[DataFrame, DataFrame, ndarray, ndarray, ndarray, ndarray]:
+                   ) -> tuple[DataFrame, DataFrame, ndarray, ndarray, ndarray]:
 
-    t = len(angle)
-    n = len(angle.columns)
+    t = len(pol)
+    n = len(pol.columns)
 
     ww_tensor = zeros((t, n, n))
-    Z = zeros((t, n, n))
-    W = zeros((t, n, n))
     X = zeros((t, n, n))
+    Y = zeros((t, n, n))
     wwy_wind = zeros((t, n))
     wwy_space = zeros((t, n))
 
     for i in range(t):
-        time_angle = angle.iloc[i, :].to_numpy()
-        time_speed = wind.iloc[i, :].to_numpy()
-
-        # This function is from the module math, so it might now work; substitute to numpy then
-        ww_tensor[i, :, :] = cos(angle_matrix - time_angle[newaxis, :])
-        ww_tensor[i, :, :] = ww_tensor[i, :, :] * time_speed[newaxis, :]
-        W[i, :, :] = ww_tensor[i, :, :]
-        ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
+        ww_tensor[i, :, :] = cos(angle_matrix - float(angle.iat[i, 0]))
+        ww_tensor[i, :, :] = ww_tensor[i, :, :] * wind.iat[i, 0]
         X[i, :, :] = ww_tensor[i, :, :]
+        ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
+        Y[i, :, :] = ww_tensor[i, :, :]
 
         # Change method to spectral radius normalization
-        Z[i, :, :] = minimum(abs(ww_tensor[i, :, :]),
-                             abs(w_matrix)) / maximum(abs(ww_tensor[i, :, :]),
-                                                      abs(reciprocal(w_matrix)))
-        Z[i, :, :] = nan_to_num(Z[i, :, :]) * 100 + 1
         ww_tensor[i, :, :] = clip(ww_tensor[i, :, :], a_min=0, a_max=None)
-
         ww_tensor[i, :, :] = ww_tensor[i, :, :] / max(eigvals(ww_tensor[i, :, :]))
 
         wwy_wind[i, :] = ww_tensor[i, :, :] @ pol.iloc[i, :].T
@@ -91,8 +81,4 @@ def spatial_tensor(pol: DataFrame,
 
     wwy_wind.set_index(pol.index, inplace=True)
     wwy_space.set_index(pol.index, inplace=True)
-    return wwy_wind, wwy_space, ww_tensor, Z, W, X
-
-
-def has_nan(matrix):
-    return isnan(matrix).any()
+    return wwy_wind, wwy_space, ww_tensor, X, Y

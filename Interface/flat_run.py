@@ -4,7 +4,7 @@ import warnings
 
 
 bWorkLaptop: bool = False
-save_to_disk: bool = False
+save_to_disk: bool = True
 
 
 class Run(object):

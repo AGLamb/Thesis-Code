@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pandas import DataFrame, read_csv, to_datetime
-from fancyimpute import IterativeImputer
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
 from SpiPy.Utils import SpatialTools
 from DTO.Database import HLDatabase
 from itertools import product
@@ -41,61 +42,32 @@ class DataBase:
         self.matrix_creator()
         return None
 
+    def create_and_impute_matrix(self, column_name):
+        matrix = self.data.pivot(columns=self.geo_lev, values=column_name)
+        names = matrix.columns
+
+        imp = IterativeImputer(max_iter=10, random_state=0)
+        matrix = DataFrame(imp.fit_transform(matrix.iloc[2000:]), index=matrix.index[2000:])
+        matrix.columns = names
+
+        return matrix
+
     def matrix_creator(self) -> None:
         unique_names = self.data[self.geo_lev].unique()
 
-        self.pollution = DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[0], "pm25_cal"])
-        self.pollution.rename(columns={"pm25_cal": unique_names[0]}, inplace=True)
-        self.wind_speed = DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[0], "Wind Speed"])
-        self.wind_speed.rename(columns={"Wind Speed": unique_names[0]}, inplace=True)
-        self.wind_direction = DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[0], "Wind Angle"])
-        self.wind_direction.rename(columns={"Wind Angle": unique_names[0]}, inplace=True)
+        self.pollution = self.create_and_impute_matrix('pm25_cal')
+        self.wind_speed = self.create_and_impute_matrix('Wind Speed')
+        self.wind_direction = self.create_and_impute_matrix('Wind Angle')
 
-        for i in range(1, len(unique_names)):
-            self.pollution = self.pollution.combine_first(
-                DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[i], "pm25_cal"])
-            )
-            self.pollution.rename(columns={"pm25_cal": unique_names[i]}, inplace=True)
+        self.wind_direction = hampel(self.wind_direction[unique_names[0]], window_size=84, n=3, imputation=True)
+        self.wind_direction.columns = unique_names[0]
 
-            self.wind_speed = self.wind_speed.combine_first(
-                DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[i], "Wind Speed"])
-            )
-            self.wind_speed.rename(columns={"Wind Speed": unique_names[i]}, inplace=True)
-
-            self.wind_direction = self.wind_direction.combine_first(
-                DataFrame(self.data.loc[self.data[self.geo_lev] == unique_names[i], "Wind Angle"])
-            )
-            self.wind_direction.rename(columns={"Wind Angle": unique_names[i]}, inplace=True)
-
-        self.pollution.columns = unique_names
-        self.wind_speed.columns = unique_names
-        self.wind_direction.columns = unique_names
-
-        indices = self.pollution.index[2000:]
-
-        imp_pol = IterativeImputer(max_iter=10, random_state=0)
-        imp_pol.fit(self.pollution.iloc[2000:])
-        self.pollution = DataFrame(imp_pol.transform(self.pollution.iloc[2000:]))
-        self.pollution.index = indices
-
-        self.wind_speed.drop(labels=unique_names[1:], axis=1, inplace=True)
-        imp_wind_speed = IterativeImputer(max_iter=10, random_state=0)
-        imp_wind_speed.fit(self.wind_speed.iloc[2000:])
-        self.wind_speed = DataFrame(imp_wind_speed.transform(self.wind_speed.iloc[2000:]))
-        self.wind_speed.index = indices
-
-        self.wind_direction.drop(labels=unique_names[1:], axis=1, inplace=True)
-        imp_wind_dir = IterativeImputer(max_iter=10, random_state=0)
-        imp_wind_dir.fit(self.wind_direction.iloc[2000:])
-        self.wind_direction = DataFrame(imp_wind_dir.transform(self.wind_direction.iloc[2000:]))
-        self.wind_direction.index = indices
+        self.wind_speed = hampel(self.wind_speed[unique_names[0]], window_size=84, n=3, imputation=True)
+        self.wind_speed.columns = unique_names[0]
 
         for column in self.pollution:
             self.pollution[column] = hampel(self.pollution[column], window_size=84, n=3, imputation=True)
-
         self.pollution = invalid_values(self.pollution)
-        self.wind_speed = invalid_values(self.wind_speed)
-        self.wind_direction = invalid_values(self.wind_direction)
         return None
 
     def SpatialComponents(self) -> None:
@@ -181,14 +153,6 @@ class RunFlow:
              self.train_data.weight_tensor)
         save(r"../DTO/test_tWind",
              self.test_data.weight_tensor)
-        save(r"../DTO/train_tX",
-             self.train_data.X)
-        save(r"../DTO/test_tX",
-             self.test_data.Y)
-        save(r"../DTO/train_tY",
-             self.train_data.Y)
-        save(r"../DTO/test_tY",
-             self.test_data.Y)
 
         mTrainMatrix = DataFrame(self.train_data.weight_matrix)
         mTestMatrix = DataFrame(self.test_data.weight_matrix)
@@ -251,8 +215,8 @@ class RunFlow:
                                    faulty=faulty,
                                    geo_level=self.geo_lev,
                                    time_interval=self.time_lev)
-        self.train_data.wind_direction = self.processed_data.wind_direction.iloc[:cutout, :].copy()
-        self.train_data.wind_speed = self.processed_data.wind_speed.iloc[:cutout, :].copy()
+        self.train_data.wind_direction = self.processed_data.wind_direction.iloc[:cutout].copy()
+        self.train_data.wind_speed = self.processed_data.wind_speed.iloc[:cutout].copy()
         self.train_data.pollution = self.processed_data.pollution.iloc[:cutout, :].copy()
         self.train_data.coordinate_dict = self.processed_data.coordinate_dict
         self.train_data.weight_matrix = self.processed_data.weight_matrix
@@ -267,8 +231,8 @@ class RunFlow:
                                   faulty=faulty,
                                   geo_level=self.geo_lev,
                                   time_interval=self.time_lev)
-        self.test_data.wind_direction = self.processed_data.wind_direction.iloc[cutout:, :].copy()
-        self.test_data.wind_speed = self.processed_data.wind_speed.iloc[cutout:, :].copy()
+        self.test_data.wind_direction = self.processed_data.wind_direction.iloc[cutout:].copy()
+        self.test_data.wind_speed = self.processed_data.wind_speed.iloc[cutout:].copy()
         self.test_data.pollution = self.processed_data.pollution.iloc[cutout:, :].copy()
         self.test_data.coordinate_dict = self.processed_data.coordinate_dict
         self.test_data.weight_matrix = self.processed_data.weight_matrix

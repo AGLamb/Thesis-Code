@@ -9,7 +9,7 @@ import warnings
 
 
 def main() -> None:
-    db_manager = HLDatabase(bWorkLaptop=False)
+    db_manager = HLDatabase(bWorkLaptop=True)
     pollution = db_manager.get_table(table_name='Train-Pollution')
     pollution.drop(labels='Date', axis=1, inplace=True)
     mSpatial = db_manager.get_table(table_name='Train-Weight Matrix')

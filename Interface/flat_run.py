@@ -3,7 +3,7 @@ from time import time
 import warnings
 
 
-bWorkLaptop: bool = True
+bWorkLaptop: bool = False
 save_to_disk: bool = True
 
 

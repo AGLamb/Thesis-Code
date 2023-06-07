@@ -53,11 +53,10 @@ class DataBase:
         return matrix
 
     def matrix_creator(self) -> None:
-        unique_names = self.data[self.geo_lev].unique()
-
         self.pollution = self.create_and_impute_matrix('pm25_cal')
         self.wind_speed = self.create_and_impute_matrix('Wind Speed')
         self.wind_direction = self.create_and_impute_matrix('Wind Angle')
+        unique_names = list(self.pollution.columns)
 
         self.wind_direction = hampel(self.wind_direction[unique_names[0]], window_size=84, n=3, imputation=True)
         self.wind_direction.columns = unique_names[0]
@@ -68,9 +67,15 @@ class DataBase:
         for column in self.pollution:
             self.pollution[column] = hampel(self.pollution[column], window_size=84, n=3, imputation=True)
         self.pollution = invalid_values(self.pollution)
+        self.pollution.columns = unique_names
         return None
 
     def SpatialComponents(self) -> None:
+        names = list(self.pollution.columns)
+
+        self.pollution = self.create_and_impute_matrix('pm25_cal')
+        self.wind_speed = self.create_and_impute_matrix('Wind Speed')
+        self.wind_direction = self.create_and_impute_matrix('Wind Angle')
         self.wSpillovers, self.sSpillovers, \
             self.weight_tensor, \
             self.X, self.Y = SpatialTools.spatial_tensor(pol=self.pollution,
@@ -78,6 +83,14 @@ class DataBase:
                                                          wind=self.wind_speed,
                                                          w_matrix=self.weight_matrix,
                                                          angle_matrix=self.angle_matrix)
+
+        wImp = IterativeImputer(max_iter=10, random_state=0)
+        self.wSpillovers = DataFrame(wImp.fit_transform(self.wSpillovers), index=self.wSpillovers.index)
+        self.wSpillovers.columns = names
+
+        sImp = IterativeImputer(max_iter=10, random_state=0)
+        self.sSpillovers = DataFrame(sImp.fit_transform(self.sSpillovers), index=self.sSpillovers.index)
+        self.sSpillovers.columns = names
         return None
 
     def delete_entries(self, pop_values: set | list, key: str) -> None:

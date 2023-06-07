@@ -60,8 +60,8 @@ def spatial_tensor(pol: DataFrame,
     wwy_space = zeros((t, n))
 
     for i in range(t):
-        ww_tensor[i, :, :] = cos(angle_matrix - float(angle.iat[i]))
-        ww_tensor[i, :, :] = ww_tensor[i, :, :] * wind.iat[i]
+        ww_tensor[i, :, :] = cos(angle_matrix - float(angle.iat[i, 0]))
+        ww_tensor[i, :, :] = ww_tensor[i, :, :] * wind.iat[i, 0]
         X[i, :, :] = ww_tensor[i, :, :]
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
         Y[i, :, :] = ww_tensor[i, :, :]

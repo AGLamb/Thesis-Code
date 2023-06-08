@@ -72,7 +72,8 @@ class QMLEOptimizer:
             x0=self.initial_params,
             bounds=self.bound,
             args=(self.mW_1, self.mY_t),
-            callback=self.callback
+            callback=self.callback,
+            method='Nelder-Mead'
         )
 
         if result.success:

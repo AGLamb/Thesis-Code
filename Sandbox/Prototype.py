@@ -22,7 +22,7 @@ def main() -> None:
     # Initial guess
     N = len(pollution.columns)
     initial_params = zeros(3*N+5)
-    initial_params[:N] = [0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9]                 # Phi
+    initial_params[:N] = [0.9] * N                                           # Phi
     initial_params[N:2*N] = list(pollution.var().values)                     # Sigma
     initial_params[2*N:3*N] = list(pollution.mean().values)                  # Mu
     initial_params[-5] = 7.87                                                # Alpha
@@ -31,7 +31,7 @@ def main() -> None:
     initial_params[-2] = 5.09                                                # Beta
     initial_params[-1] = 0.15                                                # Gamma
 
-    bounds = [(-20, 20)] * N             # Phi
+    bounds = [(-20, 20)]  * N             # Phi
     bounds += [(1, 1000)] * N            # Sigma
     bounds += [(0, 1000)] * N            # Mu
     bounds += [(-100, 100)]              # Alpha

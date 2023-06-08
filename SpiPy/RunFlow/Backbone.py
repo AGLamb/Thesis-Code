@@ -149,12 +149,11 @@ class RunFlow:
 
     def group_data(self) -> None:
         grouped_df = self.raw_data.groupby(by=[self.geo_lev, self.time_lev]).median().copy().reset_index()
-        grouped_df["Date"] = to_datetime(grouped_df[self.time_lev])
-
         if self.time_lev == "YYYYMMDD":
             grouped_df.drop(columns=["YYYYMMDD"], inplace=True)
         else:
-            grouped_df.drop(columns=["YYYYMMDD", "timestamp"], inplace=True)
+            grouped_df["Date"] = to_datetime(grouped_df[self.time_lev])
+            grouped_df.drop(columns=["timestamp"], inplace=True)
 
         grouped_df.set_index("Date", inplace=True)
         self.raw_data = grouped_df
@@ -176,22 +175,22 @@ class RunFlow:
         db = HLDatabase(bWorkLaptop=self.bWorkLaptop)
         data = {
             'Train-': {
-                'All': self.train_data.data,
-                'Pollution': self.train_data.pollution,
-                'Wind Direction': self.train_data.wind_direction,
-                'Wind Speed': self.train_data.wind_speed,
-                'Anisotropic': self.train_data.wSpillovers,
-                'Isotropic': self.train_data.sSpillovers,
-                'Weight Matrix': mTrainMatrix
+                f'All - {self.geo_lev} - {self.time_lev}': self.train_data.data,
+                f'Pollution - {self.geo_lev} - {self.time_lev}': self.train_data.pollution,
+                f'Wind Direction - {self.geo_lev} - {self.time_lev}': self.train_data.wind_direction,
+                f'Wind Speed - {self.geo_lev} - {self.time_lev}': self.train_data.wind_speed,
+                f'Anisotropic - {self.geo_lev} - {self.time_lev}': self.train_data.wSpillovers,
+                f'Isotropic - {self.geo_lev} - {self.time_lev}': self.train_data.sSpillovers,
+                f'Weight Matrix - {self.geo_lev} - {self.time_lev}': mTrainMatrix
             },
             'Test-': {
-                'All': self.test_data.data,
-                'Pollution': self.test_data.pollution,
-                'Wind Direction': self.test_data.wind_direction,
-                'Wind Speed': self.test_data.wind_speed,
-                'Anisotropic': self.test_data.wSpillovers,
-                'Isotropic': self.test_data.sSpillovers,
-                'Weight Matrix': mTestMatrix,
+                f'All - {self.geo_lev} - {self.time_lev}': self.test_data.data,
+                f'Pollution - {self.geo_lev} - {self.time_lev}': self.test_data.pollution,
+                f'Wind Direction - {self.geo_lev} - {self.time_lev}': self.test_data.wind_direction,
+                f'Wind Speed - {self.geo_lev} - {self.time_lev}': self.test_data.wind_speed,
+                f'Anisotropic - {self.geo_lev} - {self.time_lev}': self.test_data.wSpillovers,
+                f'Isotropic - {self.geo_lev} - {self.time_lev}': self.test_data.sSpillovers,
+                f'Weight Matrix - {self.geo_lev} - {self.time_lev}': mTestMatrix,
             }
         }
 

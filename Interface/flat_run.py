@@ -12,7 +12,7 @@ class Run(object):
         self.save = save_res
         self.aggregation = {
             "Geographical": ["municipality", "street"],
-            "Temporal": ["hours", "day"]
+            "Temporal": ["day"]
         }
         self.output = {}
         self.execute()

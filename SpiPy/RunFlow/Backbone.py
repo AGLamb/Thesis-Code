@@ -150,6 +150,7 @@ class RunFlow:
     def group_data(self) -> None:
         grouped_df = self.raw_data.groupby(by=[self.geo_lev, self.time_lev]).median().copy().reset_index()
         if self.time_lev == "YYYYMMDD":
+            grouped_df["Date"] = to_datetime(grouped_df[self.time_lev])
             grouped_df.drop(columns=["YYYYMMDD"], inplace=True)
         else:
             grouped_df["Date"] = to_datetime(grouped_df[self.time_lev])

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from pandas import DataFrame, read_csv, to_datetime
 from sklearn.experimental import enable_iterative_imputer
+from pandas import DataFrame, read_csv, to_datetime
 from sklearn.impute import IterativeImputer
 from SpiPy.Utils import SpatialTools
 from DTO.Database import HLDatabase
 from itertools import product
+from numpy import save, abs
 from hampel import hampel
-from numpy import save
 
 
 class DataBase:
@@ -56,7 +56,7 @@ class DataBase:
     def matrix_creator(self) -> None:
         self.pollution = self.create_and_impute_matrix('pm25_cal')
         self.wind_speed = self.create_and_impute_matrix('Wind Speed')
-        self.wind_direction = self.create_and_impute_matrix('Wind Angle')
+        self.wind_direction = abs(self.create_and_impute_matrix('Wind Angle'))
 
         unique_names = list(self.pollution.columns)
         self.wind_speed.drop(columns=unique_names[1:], inplace=True)
@@ -64,21 +64,22 @@ class DataBase:
 
         self.wind_direction[unique_names[0]] = self.wind_direction[unique_names[0]].apply(angle_correction)
 
+        def replace_values(val, mean):
+            if val <= 0:
+                return mean
+            elif val > 120:
+                return 2 * mean
+            else:
+                return val
+
+        mean_val = self.wind_speed.mean()
+        self.wind_speed = self.wind_speed.apply(replace_values, args=mean_val)
+
         for column in self.pollution:
             self.pollution[column] = hampel(self.pollution[column], window_size=84, n=3, imputation=True)
         self.pollution = invalid_values(self.pollution)
         self.pollution.columns = unique_names
 
-        def replace_values(val):
-            if val <= 0:
-                return mean_val
-            elif val > 120:
-                return 2 * mean_val
-            else:
-                return val
-
-        mean_val = self.wind_speed[unique_names[0]].mean()
-        self.wind_speed[unique_names[0]] = self.wind_speed[unique_names[0]].apply(replace_values)
         return None
 
     def SpatialComponents(self) -> None:

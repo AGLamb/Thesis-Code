@@ -10,9 +10,10 @@ import warnings
 
 def main() -> None:
     db_manager = HLDatabase(bWorkLaptop=False)
-    pollution = db_manager.get_table(table_name='Train-Pollution')
-    pollution.drop(labels='Date', axis=1, inplace=True)
-    mSpatial = db_manager.get_table(table_name='Train-Weight Matrix')
+    pollution = db_manager.get_table(table_name='Train-Pollution - tag - timestamp')
+    pollution.drop(labels='timestamp', axis=1, inplace=True)
+    pollution = pollution + 1
+    mSpatial = db_manager.get_table(table_name='Train-Weight Matrix - tag - timestamp')
     mSpatial.drop(labels='index', axis=1, inplace=True)
 
     pollution = log(pollution)
@@ -31,7 +32,7 @@ def main() -> None:
     initial_params[-2] = 5.09                                                # Beta
     initial_params[-1] = 0.15                                                # Gamma
 
-    bounds = [(-20, 20)]  * N             # Phi
+    bounds = [(-20, 20)] * N             # Phi
     bounds += [(1, 1000)] * N            # Sigma
     bounds += [(0, 1000)] * N            # Mu
     bounds += [(-100, 100)]              # Alpha

@@ -14,13 +14,17 @@ class SpatialVAR:
             constant: bool = False,
             endog: DataFrame = None,
             exog: DataFrame = None,
+            weight_matrix: ndarray = None,
+            tensor: ndarray = None,
             model_type: str = "Unrestricted",
             verbose: bool = True
     ) -> None:
         self.order = lags
         self.const = constant
-        self.endog = endog.iloc[1:, :]
-        self.exog = exog.shift(1).iloc[1:, :]
+        self.endog = endog
+        self.exog = exog
+        self.wSpillovers = tensor
+        self.weight_matrix = weight_matrix
         self.verbose = verbose
         self.model = model_type
         self.params = None
@@ -30,7 +34,7 @@ class SpatialVAR:
     def fit(self) -> None:
         if self.model == "Diagonal":
             self.fit_diagonal()
-        elif self.model == "DSTSAR":
+        elif self.model == "Constant":
             self.fit_DSTSAR()
         elif self.model == "ARD":
             self.fit_ard()
@@ -43,7 +47,11 @@ class SpatialVAR:
         output_models = {}
 
         for column in self.endog.columns:
-            output_models[column] = AutoReg(endog=self.endog[column], exog=self.exog[column], trend='n', lags=1).fit()
+            output_models[column] = AutoReg(
+                endog=self.endog[column].iloc[1:], exog=self.exog[column].shift(1).iloc[1:],
+                trend='n',
+                lags=1
+            ).fit()
             if self.verbose:
                 print(output_models[column].summary())
 
@@ -56,7 +64,7 @@ class SpatialVAR:
         return None
 
     def fit_unrestricted(self) -> None:
-        spatial_var = OLS(endog=self.endog, exog=self.exog).fit()
+        spatial_var = OLS(endog=self.endog.iloc[1:], exog=self.exog.shift(1).iloc[1:, :]).fit()
         if self.verbose:
             print(spatial_var.summary())
         self.params = spatial_var.params
@@ -68,7 +76,10 @@ class SpatialVAR:
         output_models = {}
 
         for column in self.endog.columns:
-            output_models[column] = OLS(endog=self.endog[column], exog=self.exog[column]).fit()
+            output_models[column] = OLS(
+                endog=self.endog[column].iloc[1:],
+                exog=self.exog[column].shift(1).iloc[1:]
+            ).fit()
             if self.verbose:
                 print(output_models[column].summary())
 
@@ -100,18 +111,15 @@ class SpatialVAR:
         bounds += [(0, 1)]                   # Zeta
         bounds += [(-100, 100)] * 2          # Beta and Gamma
 
-        reg_matrix = self.database.train_data.weight_matrix/max(eigvals(self.database.train_data.weight_matrix.values))
+        reg_matrix = self.weight_matrix/max(eigvals(self.weight_matrix))
         optimizer = QMLEOptimizer(
             initial_params=initial_params,
             weight_matrix=reg_matrix,
-            wind_tensor=self.database.train_data.wSpillovers,
-            exog=self.database.train_data.pollution.values,
+            wind_tensor=self.wSpillovers,
+            exog=self.endog.values,
             bounds=bounds,
         )
 
         optimizer.fit()
         model = optimizer.get_best_params()
         return model
-
-# def fit_smooth_transition() -> None:
-#     return None

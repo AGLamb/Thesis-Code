@@ -24,7 +24,7 @@ class QMLEOptimizer:
         self.mY_t = exog
 
         self.min_nll = None
-        self.best_params = None
+        self.params = None
 
     @staticmethod
     @jit(nopython=True)
@@ -52,8 +52,8 @@ class QMLEOptimizer:
 
         for t in range(2, M):
             A_t_minus_1: np.ndarray = phi + (alpha + rho * (1 / (1 + np.exp(-zeta * (
-                    mW_1[t-1, :, :]@mY_t[t-1, :]-beta-gamma*mW_1[t-2, :, :]@mY_t[t-2, :]
-            ))))) * mW_1[t-1, :, :]
+                    mW_1[t-1, :, :] @ mY_t[t-1, :] - beta - gamma * mW_1[t-2, :, :] @ mY_t[t-2, :]
+            ))))) @ mW_1[t-1, :, :]
 
             _, s_A, _ = np.linalg.svd(A_t_minus_1)
             det_A: float = np.log(np.prod(s_A))
@@ -78,11 +78,11 @@ class QMLEOptimizer:
 
         if result.success:
             self.min_nll: float = result.fun
-            self.best_params: np.ndarray = result.x
+            self.params: np.ndarray = result.x
         return None
 
     def get_best_params(self) -> np.ndarray:
-        return self.best_params
+        return self.params
 
     @staticmethod
     def callback(xk):

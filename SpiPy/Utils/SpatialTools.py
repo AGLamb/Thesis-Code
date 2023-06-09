@@ -62,9 +62,7 @@ def spatial_tensor(pol: DataFrame,
     for i in range(t):
         ww_tensor[i, :, :] = cos(angle_matrix - float(angle.iat[i, 0]))
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * wind.iat[i, 0]
-        X[i, :, :] = ww_tensor[i, :, :]
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
-        Y[i, :, :] = ww_tensor[i, :, :]
 
         # Change method to spectral radius normalization
         ww_tensor[i, :, :] = clip(ww_tensor[i, :, :], a_min=0, a_max=None)

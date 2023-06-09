@@ -46,8 +46,9 @@ class DataBase:
         matrix = self.data.pivot(columns=self.geo_lev, values=column_name)
         names = matrix.columns
 
+        n = 0 if self.time_lev == 'YYYYMMDD' else 2000
         imp = IterativeImputer(max_iter=10, random_state=0)
-        matrix = DataFrame(imp.fit_transform(matrix.iloc[2000:]), index=matrix.index[2000:])
+        matrix = DataFrame(imp.fit_transform(matrix.iloc[n:]), index=matrix.index[n:])
         matrix.columns = names
 
         return matrix
@@ -56,18 +57,28 @@ class DataBase:
         self.pollution = self.create_and_impute_matrix('pm25_cal')
         self.wind_speed = self.create_and_impute_matrix('Wind Speed')
         self.wind_direction = self.create_and_impute_matrix('Wind Angle')
+
         unique_names = list(self.pollution.columns)
+        self.wind_speed.drop(columns=unique_names[1:], inplace=True)
+        self.wind_direction.drop(columns=unique_names[1:], inplace=True)
 
-        self.wind_direction = hampel(self.wind_direction[unique_names[0]], window_size=84, n=3, imputation=True)
-        self.wind_direction.columns = unique_names[0]
-
-        self.wind_speed = hampel(self.wind_speed[unique_names[0]], window_size=84, n=3, imputation=True)
-        self.wind_speed.columns = unique_names[0]
+        self.wind_direction[unique_names[0]] = self.wind_direction[unique_names[0]].apply(angle_correction)
 
         for column in self.pollution:
             self.pollution[column] = hampel(self.pollution[column], window_size=84, n=3, imputation=True)
         self.pollution = invalid_values(self.pollution)
         self.pollution.columns = unique_names
+
+        def replace_values(val):
+            if val <= 0:
+                return mean_val
+            elif val > 120:
+                return 2 * mean_val
+            else:
+                return val
+
+        mean_val = self.wind_speed[unique_names[0]].mean()
+        self.wind_speed[unique_names[0]] = self.wind_speed[unique_names[0]].apply(replace_values)
         return None
 
     def SpatialComponents(self) -> None:
@@ -133,9 +144,6 @@ class RunFlow:
                             'datum', 'tijd', 'pm25_fac', 'pm25_max', 'pm25_min', 'components', 'sensortype',
                             'weekdag', 'uur', '#STN', 'jaar', 'maand', 'weeknummer', 'dag', 'H', 'T', 'U'],
                            axis=1, inplace=True)
-
-        for i in range(len(self.raw_data)):
-            self.raw_data.at[i, 'DD'] = angle_correction(self.raw_data.at[i, 'DD'])
 
         self.raw_data.rename(columns={"DD": "Wind Angle", "FH": "Wind Speed"}, inplace=True)
         self.delete_entries_raw(pop_values=faulty, key=self.geo_lev)
@@ -286,7 +294,6 @@ def invalid_values(df: DataFrame) -> DataFrame:
 
 
 def angle_correction(angle: int) -> int:
-    if angle > 360:
+    while angle > 360:
         angle -= 360
-        angle = angle_correction(angle)
     return angle

@@ -1,12 +1,11 @@
 from __future__ import annotations
 from typing import Any
 
-from numpy import random, zeros, fill_diagonal, exp, log
 from statsmodels.tsa.api import VAR, AutoReg
+from numpy import zeros, fill_diagonal, exp
 from SpiPy.Models import SpatialRegression
 from SpiPy.RunFlow.Backbone import *
 from SpiPy.Utils.Forecast import *
-
 
 random.seed(123)
 
@@ -26,23 +25,42 @@ class ModelSet:
         self.verbose = verbose
 
     def run(self) -> None:
-        self.ard_model = self.regress(endog=self.database.train_data.pollution,
-                                      exog=self.database.train_data.wSpillovers,
-                                      model_type="ARD")
-        self.diagonal_model = self.regress(endog=self.database.train_data.pollution,
-                                           exog=self.database.train_data.wSpillovers,
-                                           model_type="Diagonal")
-        self.constant_model = self.regress(endog=self.database.train_data.pollution,
-                                           exog=self.database.train_data.wSpillovers,
-                                           model_type="Constant")
-        self.swvar_model = self.regress(endog=self.database.train_data.pollution,
-                                        exog=self.database.train_data.wSpillovers,
-                                        model_type="Unrestricted")
-        self.svar_model = self.regress(endog=self.database.train_data.pollution,
-                                       exog=self.database.train_data.sSpillovers,
-                                       model_type="Unrestricted")
+        self.ard_model = self.regress(
+            endog=self.database.train_data.pollution,
+            exog=self.database.train_data.wSpillovers,
+            model_type="ARD"
+        )
+
+        self.diagonal_model = self.regress(
+            endog=self.database.train_data.pollution,
+            exog=self.database.train_data.wSpillovers,
+            model_type="Diagonal"
+        )
+
+        self.constant_model = self.regress(
+            endog=self.database.train_data.pollution,
+            exog=self.database.train_data.wSpillovers,
+            model_type="Constant",
+            tRatio=self.database.train_data.X,
+            tWind=self.database.train_data.weight_tensor
+        )
+
+        self.swvar_model = self.regress(
+            endog=self.database.train_data.pollution,
+            exog=self.database.train_data.wSpillovers,
+            model_type="Unrestricted"
+        )
+
+        self.svar_model = self.regress(
+            endog=self.database.train_data.pollution,
+            exog=self.database.train_data.sSpillovers,
+            model_type="Unrestricted"
+        )
+
         self.var_model = VAR(endog=self.database.train_data.pollution).fit(maxlags=1, trend='n')
+
         self.ar_models = ar_model(pollution_data=self.database.train_data.pollution)
+
         return None
 
     def get_performance(self, time_lev: str) -> ForecastSet:
@@ -54,17 +72,21 @@ class ModelSet:
             self,
             endog: DataFrame = None,
             exog: DataFrame = None,
-            tensor: ndarray = None,
-            mWeight: ndarray = None,
+            tWind: ndarray = None,
+            tRatio: ndarray = None,
             model_type: str = "Unrestricted"
     ) -> Any:
-        model = SpatialRegression.SpatialVAR(endog=endog,
-                                             exog=exog,
-                                             tensor=tensor,
-                                             weight_matrix=mWeight,
-                                             model_type=model_type,
-                                             verbose=self.verbose)
+
+        model = SpatialRegression.SpatialVAR(
+            endog=endog,
+            exog=exog,
+            tWind=tWind,
+            tRatio=tRatio,
+            model_type=model_type,
+            verbose=self.verbose
+        )
         model.fit()
+
         return model
 
 
@@ -76,6 +98,7 @@ class ForecastSet:
         self.ww_tensor = None
         self.pollution = None
         self.w_matrix = None
+        self.tX = None
         self.k = None
 
         self.performance = {
@@ -130,6 +153,7 @@ class ForecastSet:
         self.pollution = trained_set.database.test_data.pollution
         self.k = len(self.pollution.columns)
         self.ww_tensor = trained_set.database.test_data.weight_tensor
+        self.tX = trained_set.database.test_data.X
 
         self.ar_forecast(trained_set=trained_set)
         self.var_forecast(trained_set=trained_set)
@@ -143,21 +167,10 @@ class ForecastSet:
         return None
 
     def const_forecast(self, trained_set: ModelSet) -> None:
-        Beta = trained_set.constant_model.params
 
-        pred = zeros((self.t, self.k))
-        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta
-        for i in range(1, self.t):
-            argument = self.ww_tensor[i - 1, :, :] @ pred[i - 1, :].T
-            pred[i, :] = (Beta.T @ argument).T
-
-        for func in self.metric_func:
-            self.performance[func.__name__]["Constant"][:] = func(self.pollution.iloc[:self.t].to_numpy(), pred[:, :])
-        return None
-
-    def diag_forecast(self, trained_set: ModelSet) -> None:
         pol = log(self.pollution).values
         N: int = self.pollution.shape[1]
+
         phi: ndarray = zeros((N, N))
         fill_diagonal(phi, trained_set.constant_model.params[:N])
 
@@ -171,12 +184,24 @@ class ForecastSet:
         gamma: float = trained_set.constant_model.params[-1]
 
         pred = zeros((self.t, self.k))
-        pred[0:2, :] = self.pollution.iloc[-2:0, :]
-        for t in range(2, self.t):
-            A: ndarray = phi + (alpha + rho * (1 / (1 + exp(-zeta * (
-                    self.ww_tensor[t-1, :, :]@pol[t-1, :]-beta-gamma*self.ww_tensor[t-2, :, :]@pol[t-2, :]
-            ))))) * self.ww_tensor[t-1, :, :]
+        pred[0, :] = self.pollution.iloc[-1, :]
+        for t in range(1, self.t):
+            A: ndarray = phi + (alpha + rho / (1 + exp(
+                -zeta * (self.tX[t, :, :] - beta - gamma * self.tX[t, :, :])))) @ self.ww_tensor[t-1, :, :]
             pred[t, :] = mu + A @ pol[t-1, :]
+
+        for func in self.metric_func:
+            self.performance[func.__name__]["Diagonal"][:] = func(self.pollution.iloc[:self.t].to_numpy(), pred[:, :])
+        return None
+
+    def diag_forecast(self, trained_set: ModelSet) -> None:
+        Beta = trained_set.diagonal_model.params
+
+        pred = zeros((self.t, self.k))
+        pred[0, :] = trained_set.swvar_model.endog.iloc[-1, :].to_numpy() @ Beta
+        for i in range(1, self.t):
+            argument = self.ww_tensor[i - 1, :, :] @ pred[i - 1, :].T
+            pred[i, :] = (Beta.T @ argument).T
 
         for func in self.metric_func:
             self.performance[func.__name__]["Diagonal"][:] = func(self.pollution.iloc[:self.t].to_numpy(), pred[:, :])

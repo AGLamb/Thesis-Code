@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import random
+
 from sklearn.experimental import enable_iterative_imputer
 from pandas import DataFrame, read_csv, to_datetime
 from sklearn.impute import IterativeImputer
 from SpiPy.Utils import SpatialTools
 from DTO.Database import HLDatabase
+from numpy import save, abs, where
 from itertools import product
-from numpy import save, abs
 from hampel import hampel
 
 
@@ -31,7 +33,6 @@ class DataBase:
         self.sSpillovers = None
         self.wSpillovers = None
         self.X = None
-        self.Y = None
 
     def run(self) -> None:
         self.coordinate_dict = SpatialTools.coordinate_dict(
@@ -62,47 +63,39 @@ class DataBase:
         self.wind_speed.drop(columns=unique_names[1:], inplace=True)
         self.wind_direction.drop(columns=unique_names[1:], inplace=True)
 
+        self.pollution = invalid_values(self.pollution)
+        self.wind_speed = invalid_values(self.wind_speed)
         self.wind_direction[unique_names[0]] = self.wind_direction[unique_names[0]].apply(angle_correction)
 
-        def replace_values(val, mean):
+        def replace_values(val):
             if val <= 0:
                 return mean
-            elif val > 120:
+            elif val > 200:
                 return 2 * mean
             else:
                 return val
 
-        mean_val = self.wind_speed.mean()
-        self.wind_speed = self.wind_speed.apply(replace_values, args=mean_val)
+        mean = self.wind_speed[unique_names[0]].mean()
+        self.wind_speed[unique_names[0]] = self.wind_speed[unique_names[0]].apply(replace_values)
+        wSize = 6 if self.time_lev == 'timestamp' else 1
 
         for column in self.pollution:
-            self.pollution[column] = hampel(self.pollution[column], window_size=84, n=3, imputation=True)
-        self.pollution = invalid_values(self.pollution)
+            self.pollution[column] = hampel(self.pollution[column], window_size=wSize, n=3, imputation=True)
         self.pollution.columns = unique_names
 
         return None
 
     def SpatialComponents(self) -> None:
-        names = list(self.pollution.columns)
-
-        self.pollution = self.create_and_impute_matrix('pm25_cal')
-        self.wind_speed = self.create_and_impute_matrix('Wind Speed')
-        self.wind_direction = self.create_and_impute_matrix('Wind Angle')
+        interval_scalar = 1 if self.time_lev == 'timestamp' else 24
         self.wSpillovers, self.sSpillovers, \
-            self.weight_tensor, \
-            self.X, self.Y = SpatialTools.spatial_tensor(pol=self.pollution,
-                                                         angle=self.wind_direction,
-                                                         wind=self.wind_speed,
-                                                         w_matrix=self.weight_matrix,
-                                                         angle_matrix=self.angle_matrix)
-
-        wImp = IterativeImputer(max_iter=10, random_state=0)
-        self.wSpillovers = DataFrame(wImp.fit_transform(self.wSpillovers), index=self.wSpillovers.index)
-        self.wSpillovers.columns = names
-
-        sImp = IterativeImputer(max_iter=10, random_state=0)
-        self.sSpillovers = DataFrame(sImp.fit_transform(self.sSpillovers), index=self.sSpillovers.index)
-        self.sSpillovers.columns = names
+            self.weight_tensor, self.X = SpatialTools.spatial_tensor(
+                pol=self.pollution,
+                angle=self.wind_direction,
+                wind=self.wind_speed,
+                w_matrix=self.weight_matrix,
+                angle_matrix=self.angle_matrix,
+                m=interval_scalar
+        )
         return None
 
     def delete_entries(self, pop_values: set | list, key: str) -> None:
@@ -173,6 +166,11 @@ class RunFlow:
         save(r"../DTO/test_tWind",
              self.test_data.weight_tensor)
 
+        save(r"../DTO/train_tX",
+             self.train_data.X)
+        save(r"../DTO/test_tX",
+             self.test_data.X)
+
         mTrainMatrix = DataFrame(self.train_data.weight_matrix)
         mTestMatrix = DataFrame(self.test_data.weight_matrix)
         for i, _ in enumerate(self.train_data.pollution.columns):
@@ -241,10 +239,9 @@ class RunFlow:
         self.train_data.weight_matrix = self.processed_data.weight_matrix
         self.train_data.angle_matrix = self.processed_data.angle_matrix
         self.train_data.weight_tensor = self.processed_data.weight_tensor[:cutout, :, :]
+        self.train_data.X = self.processed_data.X[:cutout, :, :]
         self.train_data.sSpillovers = self.processed_data.sSpillovers.iloc[:cutout, :]
         self.train_data.wSpillovers = self.processed_data.wSpillovers.iloc[:cutout, :]
-        self.train_data.X = self.processed_data.X[:cutout, :, :]
-        self.train_data.Y = self.processed_data.Y[:cutout, :, :]
 
         self.test_data = DataBase(df=self.processed_data.data,
                                   faulty=faulty,
@@ -257,10 +254,9 @@ class RunFlow:
         self.test_data.weight_matrix = self.processed_data.weight_matrix
         self.test_data.angle_matrix = self.processed_data.angle_matrix
         self.test_data.weight_tensor = self.processed_data.weight_tensor[cutout:, :, :]
+        self.test_data.X = self.processed_data.X[cutout:, :, :]
         self.test_data.sSpillovers = self.processed_data.sSpillovers.iloc[cutout:, :]
         self.test_data.wSpillovers = self.processed_data.wSpillovers.iloc[cutout:, :]
-        self.test_data.X = self.processed_data.X[cutout:, :, :]
-        self.test_data.Y = self.processed_data.Y[cutout:, :, :]
 
         self.delete_entries()
         return None
@@ -279,22 +275,17 @@ class RunFlow:
 
 def invalid_values(df: DataFrame) -> DataFrame:
     output_df = df.copy()
-    output_df.reset_index(inplace=True, drop=True)
-    for index, row in output_df.iterrows():
-        if (row > 0).all():
-            continue
-        for col in output_df.columns:
-            if row[col] <= 0:
-                prev_val = output_df.iloc[max(index - 1, 0)][col]
-                next_val = output_df.iloc[min(index + 1, len(output_df) - 1)][col]
-                new_val = (prev_val + next_val) / 2
-                output_df.at[index, col] = new_val
-
-    output_df.set_index(df.index, inplace=True)
+    for col in output_df.columns:
+        median_val = output_df.loc[output_df[col] > 0, col].median()
+        output_df[col] = where(
+            output_df[col] > 0,
+            output_df[col],
+            median_val
+        )
     return output_df
 
 
 def angle_correction(angle: int) -> int:
-    while angle > 360:
-        angle -= 360
+    if angle > 360:
+        angle = random.uniform(0, 360)
     return angle

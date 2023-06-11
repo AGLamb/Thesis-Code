@@ -2,7 +2,6 @@ from Interface.Core import *
 from time import time
 import warnings
 
-
 bWorkLaptop: bool = False
 save_to_disk: bool = True
 
@@ -24,10 +23,12 @@ class Run(object):
 
             for value2 in self.aggregation["Temporal"]:
                 print(f'{value1} - {value2}')
-                self.output[value1][value2] = ThesisProcess(aggregate=value1,
-                                                            intervals=value2,
-                                                            save_data=self.save,
-                                                            bWorkLaptop=bWorkLaptop)
+                self.output[value1][value2] = ThesisProcess(
+                    aggregate=value1,
+                    intervals=value2,
+                    save_data=self.save,
+                    bWorkLaptop=bWorkLaptop
+                )
                 self.output[value1][value2].run()
 
                 for key in self.output[value1][value2].results:

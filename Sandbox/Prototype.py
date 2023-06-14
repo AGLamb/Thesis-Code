@@ -24,8 +24,8 @@ def main() -> None:
     initial_params[-5] = 0.5                                                 # Alpha
     initial_params[-4] = 0.5                                                 # Rho
     initial_params[-3] = 0.7                                                 # Zeta
-    initial_params[-2] = 5.0                                                 # Beta
-    initial_params[-1] = 5.0                                                 # Gamma
+    initial_params[-2] = 2.0                                                 # Beta
+    initial_params[-1] = 8.0                                                 # Gamma
 
     bounds = [(None, None)] * N                                              # Phi
     bounds += [(1, 1000)] * N                                                # Sigma
@@ -34,7 +34,7 @@ def main() -> None:
     bounds += [(None, None)]                                                 # Rho
     bounds += [(0, 1)]                                                       # Zeta
     bounds += [(None, None)]                                                 # Beta
-    bounds += [(None, None)]                                                 # Geta
+    bounds += [(None, None)]                                                 # Gamma
 
     optimizer = QMLEOptimizer(
         initial_params=initial_params,
@@ -51,10 +51,13 @@ def main() -> None:
     print("Rho:",        best_params[-4])
     print("Zeta:",       best_params[-3])
     print("Beta:",       best_params[-2])
-    print("Gamma:",       best_params[-1])
+    print("Gamma:",      best_params[-1])
     print("Phi:",        best_params[:N])
     print("Sigma:",   best_params[N:2*N])
     print("Mu:",    best_params[2*N:3*N])
+
+    print(f'AIC: {optimizer.calculate_aic()}')
+    print(f'BIC: {optimizer.calculate_bic()}')
     return None
 
 

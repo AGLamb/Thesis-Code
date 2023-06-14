@@ -1,4 +1,5 @@
 from Interface.Core import *
+from pandas import DataFrame
 from time import time
 import warnings
 
@@ -35,6 +36,8 @@ class Run(object):
                     for func in self.output[value1][value2].performance_set.metric_func:
                         print(f'For metric {func} at alpha = {key:.1f}, '
                               f'the MCS includes {self.output[value1][value2].results[key][func.__name__].included}')
+
+                DataFrame(self.output[value1][value2].results).to_csv('Output.csv')
         return None
 
 

@@ -77,7 +77,7 @@ class DataBase:
 
         mean = self.wind_speed[unique_names[0]].mean()
         self.wind_speed[unique_names[0]] = self.wind_speed[unique_names[0]].apply(replace_values)
-        wSize = 6 if self.time_lev == 'timestamp' else 1
+        wSize = 72 if self.time_lev == 'timestamp' else 1
 
         for column in self.pollution:
             self.pollution[column] = hampel(self.pollution[column], window_size=wSize, n=3, imputation=True)

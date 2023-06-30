@@ -47,14 +47,12 @@ def spatial_tensor(pol: DataFrame,
                    angle: DataFrame,
                    wind: DataFrame,
                    w_matrix: ndarray,
-                   angle_matrix: ndarray,
-                   m: int = 1
-                   ) -> tuple[DataFrame, DataFrame, ndarray, ndarray]:
+                   angle_matrix: ndarray
+                   ) -> tuple[DataFrame, DataFrame, ndarray]:
 
     t = pol.shape[0]
     n = pol.shape[1]
 
-    X = zeros((t, n, n))
     ww_tensor = zeros((t, n, n))
     wwy_wind = zeros((t, n))
     wwy_space = zeros((t, n))
@@ -64,7 +62,6 @@ def spatial_tensor(pol: DataFrame,
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * wind.iat[i, 0]
         ww_tensor[i, :, :] = ww_tensor[i, :, :] * w_matrix
 
-        X[i, :, :] = abs(ww_tensor[i, :, :])
         ww_tensor[i, :, :] = clip(ww_tensor[i, :, :], a_min=0, a_max=None)
 
         wwy_wind[i, :] = ww_tensor[i, :, :] @ pol.iloc[i, :].T
@@ -78,4 +75,4 @@ def spatial_tensor(pol: DataFrame,
 
     wwy_wind.set_index(pol.index, inplace=True)
     wwy_space.set_index(pol.index, inplace=True)
-    return wwy_wind, wwy_space, ww_tensor, X
+    return wwy_wind, wwy_space, ww_tensor

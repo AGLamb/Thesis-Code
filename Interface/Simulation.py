@@ -49,8 +49,8 @@ for i in range(N):
 N = Y.shape[1]
 initial_params = zeros(3*N+5)
 initial_params[:N] = [0.9] * N                                           # Phi
-initial_params[N:2*N] = list(vars)                                     # Sigma
-initial_params[2*N:3*N] = list(means)                                  # Mu
+initial_params[N:2*N] = list(vars)                                       # Sigma
+initial_params[2*N:3*N] = list(means)                                    # Mu
 initial_params[-5] = 0.25                                                # Alpha
 initial_params[-4] = 0.8                                                 # Rho
 initial_params[-3] = 0.2                                                 # Zeta

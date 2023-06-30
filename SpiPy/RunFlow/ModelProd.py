@@ -11,19 +11,6 @@ random.seed(123)
 
 
 class ModelSet:
-    def __init__(self,
-                 database: RunFlow,
-                 verbose: bool = False) -> None:
-        self.ar_models = None
-        self.var_model = None
-        self.svar_model = None
-        self.swvar_model = None
-        self.constant_model = None
-        self.diagonal_model = None
-        self.ard_model = None
-        self.database = database
-        self.verbose = verbose
-
     def run(self) -> None:
         self.ard_model = self.regress(
             endog=self.database.train_data.pollution,
@@ -37,11 +24,19 @@ class ModelSet:
             model_type="Diagonal"
         )
 
+        self.T_model = self.regress(
+            endog=self.database.train_data.pollution,
+            exog=self.database.train_data.wSpillovers,
+            model_type="T",
+            mWeight=self.database.train_data.weight_matrix,
+            tWind=self.database.train_data.weight_tensor
+        )
+
         self.constant_model = self.regress(
             endog=self.database.train_data.pollution,
             exog=self.database.train_data.wSpillovers,
             model_type="Constant",
-            tRatio=self.database.train_data.X,
+            mWeight=self.database.train_data.weight_matrix,
             tWind=self.database.train_data.weight_tensor
         )
 
@@ -68,12 +63,26 @@ class ModelSet:
         performance.run(trained_set=self)
         return performance
 
+    def __init__(self,
+                 database: RunFlow,
+                 verbose: bool = False) -> None:
+        self.T_model = None
+        self.ar_models = None
+        self.var_model = None
+        self.svar_model = None
+        self.swvar_model = None
+        self.constant_model = None
+        self.diagonal_model = None
+        self.ard_model = None
+        self.database = database
+        self.verbose = verbose
+
     def regress(
             self,
             endog: DataFrame = None,
             exog: DataFrame = None,
+            mWeight: ndarray = None,
             tWind: ndarray = None,
-            tRatio: ndarray = None,
             model_type: str = "Unrestricted"
     ) -> Any:
 
@@ -81,7 +90,7 @@ class ModelSet:
             endog=endog,
             exog=exog,
             tWind=tWind,
-            tRatio=tRatio,
+            mWeight=mWeight,
             model_type=model_type,
             verbose=self.verbose
         )
@@ -98,7 +107,6 @@ class ForecastSet:
         self.ww_tensor = None
         self.pollution = None
         self.w_matrix = None
-        self.tX = None
         self.k = None
 
         self.performance = {
@@ -109,7 +117,8 @@ class ForecastSet:
                 'SWVAR': zeros(self.t),
                 'Constant': zeros(self.t),
                 'ARD': zeros(self.t),
-                'Diagonal': zeros(self.t)
+                'Diagonal': zeros(self.t),
+                'T': zeros(self.t)
             },
             "MSE": {
                 'AR': zeros(self.t),
@@ -118,7 +127,8 @@ class ForecastSet:
                 'SWVAR': zeros(self.t),
                 'Constant': zeros(self.t),
                 'ARD': zeros(self.t),
-                'Diagonal': zeros(self.t)
+                'Diagonal': zeros(self.t),
+                'T': zeros(self.t)
             },
             "RMSE": {
                 'AR': zeros(self.t),
@@ -127,7 +137,8 @@ class ForecastSet:
                 'SWVAR': zeros(self.t),
                 'Constant': zeros(self.t),
                 'ARD': zeros(self.t),
-                'Diagonal': zeros(self.t)
+                'Diagonal': zeros(self.t),
+                'T': zeros(self.t)
             },
             "MAE": {
                 'AR': zeros(self.t),
@@ -136,7 +147,8 @@ class ForecastSet:
                 'SWVAR': zeros(self.t),
                 'Constant': zeros(self.t),
                 'ARD': zeros(self.t),
-                'Diagonal': zeros(self.t)
+                'Diagonal': zeros(self.t),
+                'T': zeros(self.t)
             },
             "SMAPE": {
                 'AR': zeros(self.t),
@@ -145,7 +157,8 @@ class ForecastSet:
                 'SWVAR': zeros(self.t),
                 'Constant': zeros(self.t),
                 'ARD': zeros(self.t),
-                'Diagonal': zeros(self.t)
+                'Diagonal': zeros(self.t),
+                'T': zeros(self.t)
             },
         }
 
@@ -153,45 +166,56 @@ class ForecastSet:
         self.pollution = trained_set.database.test_data.pollution
         self.k = len(self.pollution.columns)
         self.ww_tensor = trained_set.database.test_data.weight_tensor
-        self.tX = trained_set.database.test_data.X
 
         self.ar_forecast(trained_set=trained_set)
         self.var_forecast(trained_set=trained_set)
         self.svar_forecast(trained_set=trained_set)
         self.swvar_forecast(trained_set=trained_set)
-        self.const_forecast(trained_set=trained_set)
+        self.const_forecast(trained_set=trained_set, mod_type="Constant")
         self.diag_forecast(trained_set=trained_set)
         self.ard_forecast(trained_set=trained_set)
+        self.const_forecast(trained_set=trained_set, mod_type="T")
 
         self.output_maker()
         return None
 
-    def const_forecast(self, trained_set: ModelSet) -> None:
-
-        pol = log(self.pollution).values
+    def const_forecast(self, trained_set: ModelSet, mod_type: str) -> None:
         N: int = self.pollution.shape[1]
+        if mod_type == "T":
+            phi: ndarray = zeros((N, N))
+            fill_diagonal(phi, trained_set.T_model.params[:N])
 
-        phi: ndarray = zeros((N, N))
-        fill_diagonal(phi, trained_set.constant_model.params[:N])
+            mu: ndarray = zeros(N)
+            mu[:] = trained_set.constant_model.params[2*N:3*N]
 
-        mu: ndarray = zeros(N)
-        mu[:] = trained_set.constant_model.params[2*N:3*N]
+            alpha: float = trained_set.T_model.params[-5]
+            rho: float = trained_set.T_model.params[-4]
+            zeta: float = trained_set.T_model.params[-3]
+            beta: float = trained_set.T_model.params[-2]
+            gamma: float = trained_set.T_model.params[-1]
+        else:
+            phi: ndarray = zeros((N, N))
+            fill_diagonal(phi, trained_set.T_model.params[:N])
 
-        alpha: float = trained_set.constant_model.params[-5]
-        rho: float = trained_set.constant_model.params[-4]
-        zeta: float = trained_set.constant_model.params[-3]
-        beta: float = trained_set.constant_model.params[-2]
-        gamma: float = trained_set.constant_model.params[-1]
+            mu: ndarray = zeros(N)
+            mu[:] = trained_set.constant_model.params[2*N:3*N]
+
+            alpha: float = trained_set.T_model.params[-5]
+            rho: float = trained_set.T_model.params[-4]
+            zeta: float = trained_set.T_model.params[-3]
+            beta: float = trained_set.T_model.params[-2]
+            gamma: float = trained_set.T_model.params[-1]
 
         pred = zeros((self.t, self.k))
         pred[0, :] = self.pollution.iloc[-1, :]
         for t in range(1, self.t):
-            A: ndarray = phi + (alpha + rho / (1 + exp(
-                -zeta * (self.tX[t, :, :] - beta - gamma * self.tX[t, :, :])))) @ self.ww_tensor[t-1, :, :]
-            pred[t, :] = mu + A @ pol[t-1, :]
+            A: ndarray = phi + alpha * self.w_matrix + 1 / (1 + exp(
+                -zeta * (self.ww_tensor[t-1, :, :] - beta - gamma * self.ww_tensor[t-1, :, :] ** 2)
+            )) * self.ww_tensor[t-1, :, :]
+            pred[t, :] = mu + A @ self.pollution[t-1, :]
 
         for func in self.metric_func:
-            self.performance[func.__name__]["Diagonal"][:] = func(self.pollution.iloc[:self.t].to_numpy(), pred[:, :])
+            self.performance[func.__name__][mod_type][:] = func(self.pollution.iloc[:self.t].to_numpy(), pred[:, :])
         return None
 
     def diag_forecast(self, trained_set: ModelSet) -> None:

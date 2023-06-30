@@ -5,9 +5,9 @@ import random
 from sklearn.experimental import enable_iterative_imputer
 from pandas import DataFrame, read_csv, to_datetime
 from sklearn.impute import IterativeImputer
+from numpy import save, abs, where, log
 from SpiPy.Utils import SpatialTools
 from DTO.Database import HLDatabase
-from numpy import save, abs, where
 from itertools import product
 from hampel import hampel
 
@@ -32,7 +32,6 @@ class DataBase:
         self.weight_tensor = None
         self.sSpillovers = None
         self.wSpillovers = None
-        self.X = None
 
     def run(self) -> None:
         self.coordinate_dict = SpatialTools.coordinate_dict(
@@ -77,25 +76,21 @@ class DataBase:
 
         mean = self.wind_speed[unique_names[0]].mean()
         self.wind_speed[unique_names[0]] = self.wind_speed[unique_names[0]].apply(replace_values)
-        wSize = 72 if self.time_lev == 'timestamp' else 1
 
-        for column in self.pollution:
-            self.pollution[column] = hampel(self.pollution[column], window_size=wSize, n=3, imputation=True)
         self.pollution.columns = unique_names
+        self.pollution = log(self.pollution + 1)
 
         return None
 
     def SpatialComponents(self) -> None:
-        interval_scalar = 1 if self.time_lev == 'timestamp' else 24
         self.wSpillovers, self.sSpillovers, \
-            self.weight_tensor, self.X = SpatialTools.spatial_tensor(
+            self.weight_tensor = SpatialTools.spatial_tensor(
                 pol=self.pollution,
                 angle=self.wind_direction,
                 wind=self.wind_speed,
                 w_matrix=self.weight_matrix,
-                angle_matrix=self.angle_matrix,
-                m=interval_scalar
-        )
+                angle_matrix=self.angle_matrix
+            )
         return None
 
     def delete_entries(self, pop_values: set | list, key: str) -> None:
@@ -166,11 +161,6 @@ class RunFlow:
         save(r"../DTO/test_tWind",
              self.test_data.weight_tensor)
 
-        save(r"../DTO/train_tX",
-             self.train_data.X)
-        save(r"../DTO/test_tX",
-             self.test_data.X)
-
         mTrainMatrix = DataFrame(self.train_data.weight_matrix)
         mTestMatrix = DataFrame(self.test_data.weight_matrix)
         for i, _ in enumerate(self.train_data.pollution.columns):
@@ -239,7 +229,6 @@ class RunFlow:
         self.train_data.weight_matrix = self.processed_data.weight_matrix
         self.train_data.angle_matrix = self.processed_data.angle_matrix
         self.train_data.weight_tensor = self.processed_data.weight_tensor[:cutout, :, :]
-        self.train_data.X = self.processed_data.X[:cutout, :, :]
         self.train_data.sSpillovers = self.processed_data.sSpillovers.iloc[:cutout, :]
         self.train_data.wSpillovers = self.processed_data.wSpillovers.iloc[:cutout, :]
 
@@ -254,7 +243,6 @@ class RunFlow:
         self.test_data.weight_matrix = self.processed_data.weight_matrix
         self.test_data.angle_matrix = self.processed_data.angle_matrix
         self.test_data.weight_tensor = self.processed_data.weight_tensor[cutout:, :, :]
-        self.test_data.X = self.processed_data.X[cutout:, :, :]
         self.test_data.sSpillovers = self.processed_data.sSpillovers.iloc[cutout:, :]
         self.test_data.wSpillovers = self.processed_data.wSpillovers.iloc[cutout:, :]
 

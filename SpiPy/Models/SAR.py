@@ -10,8 +10,8 @@ class QMLEOptimizer:
             initial_params: np.ndarray,
             bounds: list,
             wind_tensor: np.ndarray,
-            exog: np.ndarray,
-            ratio: np.ndarray
+            weight_matrix: np.ndarray,
+            exog: np.ndarray
     ) -> None:
 
         self.N: int = exog.shape[1]
@@ -19,11 +19,11 @@ class QMLEOptimizer:
         assert len(initial_params) == 3 * self.N + 5, "Initial_params must be of size 2N + 5"
 
         self.initial_params = initial_params
+        self.mW_0 = weight_matrix
         self.mW_1 = wind_tensor
         self.bound = bounds
         self.iteration = 0
         self.mY_t = exog
-        self.X = ratio
 
         self.min_nll = None
         self.params = None
@@ -32,9 +32,9 @@ class QMLEOptimizer:
     @njit
     def likelihood_function(
             params: np.ndarray,
+            mW_0: np.ndarray,
             mW_1: np.ndarray,
-            mY_t: np.ndarray,
-            X: np.ndarray
+            mY_t: np.ndarray
     ) -> float:
 
         M: int = mY_t.shape[0]
@@ -55,21 +55,18 @@ class QMLEOptimizer:
         beta: float = params[-2]
         gamma: float = params[-1]
 
-        det_Sigma_term: float = -0.5 * np.log(np.linalg.det(Sigma))
+        det_Sigma_term: float = 0.5 * np.log(np.linalg.det(Sigma))
         pinv_Sigma = np.linalg.pinv(Sigma)
         log_likelihood: np.ndarray = np.zeros(M-1)
 
         for t in prange(1, M):
-            A_t_minus_1: np.ndarray = phi + (alpha + rho / (1 + np.exp(
-                -zeta * (X[t, :, :] - beta - gamma * X[t, :, :] @ X[t, :, :].T)))) @ mW_1[t-1, :, :]
-
-            _, s_A, _ = np.linalg.svd(A_t_minus_1)
-            det_A: float = np.log(np.prod(s_A))
+            A_t_minus_1: np.ndarray = phi + alpha * mW_0 + 1 / (1 + np.exp(
+                -zeta * (mW_1[t-1, :, :] - beta - gamma * mW_1[t-1, :, :] ** 2))) * mW_1[t-1, :, :]
 
             residual_t: np.ndarray = mY_t[t, :] - mu - A_t_minus_1 @ mY_t[t-1, :]
-            log_likelihood[t-1] = det_A - 0.5 * np.dot(residual_t.T, np.dot(pinv_Sigma, residual_t))
+            log_likelihood[t-1] = -0.5 * np.dot(residual_t.T, np.dot(pinv_Sigma, residual_t))
 
-        return -(np.sum(log_likelihood) + det_Sigma_term * (M - 1))
+        return -(np.sum(log_likelihood) - det_Sigma_term * (M - 1) - 0.5 * N * (M - 1) * np.log(2 * np.pi))
 
     def fit(self) -> None:
         print("Optimisation started...")
@@ -77,7 +74,7 @@ class QMLEOptimizer:
             fun=self.likelihood_function,
             x0=self.initial_params,
             bounds=self.bound,
-            args=(self.mW_1, self.mY_t, self.X),
+            args=(self.mW_0, self.mW_1, self.mY_t),
             callback=self.callback,
             method='L-BFGS-B'
         )
@@ -97,12 +94,12 @@ class QMLEOptimizer:
 
     def calculate_aic(self):
         K = len(self.initial_params)
-        return 2 * K - 2 * self.min_nll
+        return 2 * K + 2 * self.min_nll
 
     def calculate_bic(self):
         K = len(self.initial_params)
         n = len(self.mY_t)
-        return K * np.log(n) - 2 * self.min_nll
+        return K * np.log(n) + 2 * self.min_nll
 
 
 class TQMLEOptimizer:
@@ -110,18 +107,18 @@ class TQMLEOptimizer:
             self,
             initial_params: np.ndarray,
             bounds: list,
+            weight_matrix: np.ndarray,
             wind_tensor: np.ndarray,
-            exog: np.ndarray,
-            ratio: np.ndarray,
+            exog: np.ndarray
     ) -> None:
 
         self.N: int = exog.shape[1]
         self.initial_params = initial_params
+        self.mW_0 = weight_matrix
         self.mW_1 = wind_tensor
         self.bound = bounds
         self.iteration = 0
         self.mY_t = exog
-        self.X = ratio
 
         self.min_nll = None
         self.params = np.zeros(self.initial_params.shape[0])
@@ -130,9 +127,9 @@ class TQMLEOptimizer:
     @njit
     def likelihood_function(
             params: np.ndarray,
+            mW_0: np.ndarray,
             mW_1: np.ndarray,
-            mY_t: np.ndarray,
-            X: np.ndarray
+            mY_t: np.ndarray
     ) -> float:
 
         M: int = mY_t.shape[0]
@@ -152,27 +149,23 @@ class TQMLEOptimizer:
         zeta: float = params[-4]
         beta: float = params[-3]
         gamma: float = params[-2]
-        v: int = params[-1]
+        v: float = params[-1]
 
-        det_Sigma_term: float = -0.5 * np.log(np.linalg.det(Sigma))
-
+        det_Sigma_term: float = 0.5 * np.log(np.linalg.det(Sigma))
         pinv_Sigma = np.linalg.pinv(Sigma)
-
         log_likelihood: np.ndarray = np.zeros(M - 1)
 
-        for t in prange(1, M):
-            A_t_minus_1: np.ndarray = phi + (alpha + rho / (1 + np.exp(
-                -zeta * (X[t, :, :] - beta - gamma * X[t, :, :])))) @ mW_1[t - 1, :, :]
+        constant_term: float = np.log(math.gamma((v + N) / 2)) - np.log(math.gamma(v / 2)) - (N / 2) * np.log(v - 2)
 
-            _, s_A, _ = np.linalg.svd(A_t_minus_1)
-            det_A: float = np.log(np.prod(s_A))
+        for t in prange(1, M):
+            A_t_minus_1: np.ndarray = phi + alpha * mW_0 + 1 / (1 + np.exp(
+                -zeta * (mW_1[t-1, :, :] - beta - gamma * mW_1[t-1, :, :] ** 2))) * mW_1[t - 1, :, :]
 
             residual_t: np.ndarray = mY_t[t, :] - mu - A_t_minus_1 @ mY_t[t - 1, :]
-            log_likelihood[t - 1] = np.log(math.gamma((v + N) / 2)) - np.log(math.gamma(v / 2)) - (
-                    N / 2) * np.log(v - 2) + np.log(det_A) - ((v + N) / 2) * np.log(
+            log_likelihood[t - 1] = constant_term - ((v + N) / 2) * np.log(
                 1 + np.dot(residual_t.T, np.dot(pinv_Sigma, residual_t)) / (v - 2))
 
-        return -(np.sum(log_likelihood) + det_Sigma_term * (M - 1))
+        return -(np.sum(log_likelihood) - det_Sigma_term * (M - 1))
 
     def fit(self) -> None:
         print("Optimisation started...")
@@ -180,7 +173,7 @@ class TQMLEOptimizer:
             fun=self.likelihood_function,
             x0=self.initial_params,
             bounds=self.bound,
-            args=(self.mW_1, self.mY_t, self.X),
+            args=(self.mW_0, self.mW_1, self.mY_t),
             callback=self.callback,
             method='L-BFGS-B'
         )
@@ -199,9 +192,9 @@ class TQMLEOptimizer:
 
     def calculate_aic(self):
         K = len(self.initial_params)
-        return 2 * K - 2 * self.min_nll
+        return 2 * K + 2 * self.min_nll
 
     def calculate_bic(self):
         K = len(self.initial_params)
         n = len(self.mY_t)
-        return K * np.log(n) - 2 * self.min_nll
+        return K * np.log(n) + 2 * self.min_nll

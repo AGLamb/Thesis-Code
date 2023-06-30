@@ -1,3 +1,4 @@
+from numpy.linalg import eigvals
 from SpiPy.Models.SAR import *
 from numpy import load, zeros
 from DTO.Database import *
@@ -8,12 +9,15 @@ import warnings
 
 
 def main() -> None:
-    db_manager = HLDatabase(bWorkLaptop=False)
+    db_manager = HLDatabase(bWorkLaptop=True)
     pollution = db_manager.get_table(table_name='Train-Pollution - tag - timestamp')
     pollution.drop(labels='timestamp', axis=1, inplace=True)
 
+    mWeight = db_manager.get_table(table_name='Train-Weight Matrix - tag - timestamp')
+    mWeight.drop(columns='index', axis=1, inplace=True)
+    mWeight /= max(eigvals(mWeight.values))
+
     tWind = load(r"../DTO/train_tWind.npy")
-    tX = load(r"../DTO/train_tX.npy", allow_pickle=True)
 
     # Initial guess
     N = pollution.shape[1]
@@ -21,29 +25,29 @@ def main() -> None:
     initial_params[:N] = [1.5] * N                                           # Phi
     initial_params[N:2*N] = list(pollution.var().values)                     # Sigma
     initial_params[2*N:3*N] = list(pollution.mean().values)                  # Mu
-    initial_params[-6] = 0.5                                                 # Alpha
+    initial_params[-6] = 0.3                                                 # Alpha
     initial_params[-5] = 0.5                                                 # Rho
     initial_params[-4] = 0.7                                                 # Zeta
-    initial_params[-3] = 10.0                                                 # Beta
-    initial_params[-2] = 5.0                                                 # Gamma
-    initial_params[-1] = 15                                                  # DF
+    initial_params[-3] = 0.5                                                 # Beta
+    initial_params[-2] = 1.5                                                 # Gamma
+    initial_params[-1] = 5                                                   # DF
 
-    bounds = [(-5, 5)] * N                                                # Phi
-    bounds += [(1, 1000)] * N                                             # Sigma
-    bounds += [(0, 500)] * N                                              # Mu
-    bounds += [(-2, 2)]                                                   # Alpha
-    bounds += [(-2, 2)]                                                   # Rho
-    bounds += [(0, 1)]                                                    # Zeta
-    bounds += [(-50, 50)]                                                 # Beta
-    bounds += [(-50, 50)]                                                 # Gamma
-    bounds += [(4, 30)]                                                   # DF
+    bounds = [(None, None)] * N                                              # Phi
+    bounds += [(1, None)] * N                                                # Sigma
+    bounds += [(0, None)] * N                                                # Mu
+    bounds += [(None, None)]                                                 # Alpha
+    bounds += [(None, None)]                                                 # Rho
+    bounds += [(0, 1)]                                                       # Zeta
+    bounds += [(None, None)]                                                 # Beta
+    bounds += [(None, None)]                                                 # Gamma
+    bounds += [(2.01, None)]                                                 # DF
 
     optimizer = TQMLEOptimizer(
         initial_params=initial_params,
+        weight_matrix=mWeight.values,
         wind_tensor=tWind,
         exog=pollution.values,
-        bounds=bounds,
-        ratio=tX
+        bounds=bounds
     )
 
     optimizer.fit()
